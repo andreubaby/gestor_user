@@ -1,0 +1,66 @@
+/* Centrar pantalla y fondo */
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f7fafc; /* gris claro */
+    font-family: sans-serif;
+}
+
+/* Caja del formulario */
+.login-box {
+    background: #fff;
+    padding: 2rem;
+    border-radius: .5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Titular */
+.login-box h1 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Inputs */
+.login-box input[type="email"],
+.login-box input[type="password"] {
+    width: 100%;
+    padding: .5rem;
+    border: 1px solid #ccc;
+    border-radius: .25rem;
+    margin-top: .25rem;
+}
+
+/* Botón */
+.login-box button {
+    width: 100%;
+    padding: .75rem;
+    margin-top: 1rem;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: .25rem;
+    cursor: pointer;
+}
+.login-box button:hover {
+    background: #1e40af;
+}
+
+/* Mensajes */
+.login-box .success {
+    background: #d1fae5;
+    color: #065f46;
+    padding: .5rem;
+    margin-bottom: 1rem;
+    border-radius: .25rem;
+}
+.login-box .error {
+    color: #b91c1c;
+    font-size: .875rem;
+    margin-top: .25rem;
+}
