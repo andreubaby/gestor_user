@@ -320,29 +320,29 @@
                             $gris = 'bg-slate-100 text-slate-500 ring-slate-200';
                         @endphp
 
-                        <div class="inline-flex items-center gap-1">
+                        <button type="button"
+                                class="inline-flex items-center gap-1"
+                                onclick="event.stopPropagation(); openFichajesModal(this)"
+                                aria-label="Ver historial de fichajes"
+                                data-worker="{{ $registro->id }}"
+                                data-nombre="{{ e($registro->nombre) }}"
+                                data-email="{{ e($registro->email ?? '') }}">
                             @for ($i = 0; $i < 4; $i++)
-                                @php
-                                    $b = $valores[$i] ?? null;
-                                @endphp
+                                @php $b = $valores[$i] ?? null; @endphp
 
                                 @if(isset($map[$b]))
-                                    <span
-                                        class="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm ring-1 {{ $map[$b][1] }}"
-                                        title="Bienestar {{ $b }}"
-                                    >
+                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm ring-1 {{ $map[$b][1] }}"
+                                          title="Bienestar {{ $b }}">
                                         {{ $map[$b][0] }}
                                     </span>
                                 @else
-                                    <span
-                                        class="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm ring-1 {{ $gris }}"
-                                        title="Sin fichaje"
-                                    >
+                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm ring-1 {{ $gris }}"
+                                          title="Sin fichaje">
                                         🙂
                                     </span>
                                 @endif
                             @endfor
-                        </div>
+                        </button>
                     </td>
 
                     <!-- Email -->
@@ -471,6 +471,43 @@
       class="fixed bottom-6 right-6 z-[60] hidden rounded-xl bg-slate-900 text-white px-4 py-2 text-sm shadow-lg">
   Copiado ✅
 </span>
+
+<!-- ✅ MODAL FICHAJES -->
+<div id="fichajesModal" class="fixed inset-0 hidden items-center justify-center bg-black/40 p-3 sm:p-6 z-50">
+    <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 overflow-hidden">
+
+        <div class="px-5 py-4 border-b flex items-center justify-between bg-white">
+            <div>
+                <h3 id="fichajesTitle" class="text-lg font-semibold text-gray-900">Historial de fichajes</h3>
+                <p id="fichajesSub" class="text-sm text-gray-500 mt-0.5">—</p>
+            </div>
+            <button type="button" onclick="closeFichajesModal()"
+                    class="text-gray-500 hover:text-gray-800" aria-label="Cerrar">✖</button>
+        </div>
+
+        <div class="p-5 overflow-auto max-h-[70vh]">
+            <div id="fichajesLoading" class="text-sm text-gray-500">Cargando…</div>
+
+            <div id="fichajesEmpty" class="hidden text-sm text-gray-500">
+                No hay fichajes para mostrar.
+            </div>
+
+            <div id="fichajesError" class="hidden text-sm text-red-600">
+                Error cargando los fichajes.
+            </div>
+
+            <ul id="fichajesList" class="hidden divide-y divide-gray-100"></ul>
+        </div>
+
+        <div class="px-5 py-4 border-t flex items-center justify-end gap-2 bg-white">
+            <button type="button" onclick="closeFichajesModal()"
+                    class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition">
+                Cerrar
+            </button>
+        </div>
+
+    </div>
+</div>
 
 <!-- ✅ MODAL AUSENCIAS (CALENDARIO) -->
 <div id="ausModal" class="fixed inset-0 hidden items-center justify-center bg-black/40 p-3 sm:p-6 z-50">
@@ -616,6 +653,7 @@
             pdfVac: @json(route('trabajadores.vacaciones.pdf', ['trabajador' => '__ID__'])),
             pdfPer:   @json(route('trabajadores.permisos.pdf',   ['trabajador' => '__ID__'])),
             pdfBaj:   @json(route('trabajadores.bajas.pdf',      ['trabajador' => '__ID__'])),
+            fichajes: @json(route('trabajadores.fichajes.get', ['trabajador' => '__ID__'])),
         },
         csrf: @json(csrf_token()),
     };

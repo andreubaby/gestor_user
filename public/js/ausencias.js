@@ -952,6 +952,209 @@ function occupiedByAnyBackend(){
     return unionBusyAllTabs();
 }
 
+function openFichajesModal(el) {
+    const modal   = document.getElementById('fichajesModal');
+    const title   = document.getElementById('fichajesTitle');
+    const sub     = document.getElementById('fichajesSub');
+
+    const loading = document.getElementById('fichajesLoading');
+    const empty   = document.getElementById('fichajesEmpty');
+    const error   = document.getElementById('fichajesError');
+    const list    = document.getElementById('fichajesList');
+
+    const workerId = el.dataset.worker;
+    const nombre   = el.dataset.nombre || '—';
+    const email    = el.dataset.email || '—';
+
+    title.textContent = 'Historial de fichajes';
+    sub.textContent   = `${nombre} · ${email}`;
+
+    // Reset UI
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    error.classList.add('hidden');
+    list.classList.add('hidden');
+    list.innerHTML = '';
+
+    // Asegura un área de resumen (lo creamos si no existe)
+    let summary = document.getElementById('fichajesSummary');
+    if (!summary) {
+        summary = document.createElement('div');
+        summary.id = 'fichajesSummary';
+        summary.className = 'mb-4 hidden';
+        list.parentElement.insertBefore(summary, list);
+    }
+    summary.classList.add('hidden');
+    summary.innerHTML = '';
+
+    // Abrir modal
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    const url = window.APP.routes.fichajes.replace('__ID__', workerId) + '?limit=180';
+
+    fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then(r => r.json())
+        .then(payload => {
+            loading.classList.add('hidden');
+
+            if (!payload || payload.ok !== true) {
+                error.classList.remove('hidden');
+                return;
+            }
+
+            const rows = Array.isArray(payload.data) ? payload.data : [];
+            if (rows.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            // Helpers
+            const emojiFor = (b) => (b === 1 ? '🙂' : b === 2 ? '😐' : b === 3 ? '🙁' : b === 4 ? '😡' : '🙂');
+            const labelFor = (b) => (b === 1 ? 'Bien' : b === 2 ? 'Regular' : b === 3 ? 'Mal' : b === 4 ? 'Muy mal' : '—');
+
+            const formatDayHeader = (yyyy_mm_dd) => {
+                // yyyy-mm-dd -> Date local
+                const [y, m, d] = (yyyy_mm_dd || '').split('-').map(Number);
+                if (!y || !m || !d) return 'Sin fecha';
+
+                const dt = new Date(y, m - 1, d);
+                const today = new Date();
+                const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const d0 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+                const diffDays = Math.round((t0 - d0) / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 0) return 'Hoy';
+                if (diffDays === 1) return 'Ayer';
+
+                // “lunes, 28 dic 2025”
+                return dt.toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                });
+            };
+
+            // --- Resumen (friendly)
+            const nums = rows.map(r => Number(r.bienestar)).filter(n => n >= 1 && n <= 4);
+            const count = rows.length;
+            const avg = nums.length ? (nums.reduce((a, b) => a + b, 0) / nums.length) : null;
+            const dist = [1,2,3,4].map(v => nums.filter(n => n === v).length);
+
+            summary.innerHTML = `
+        <div class="rounded-xl ring-1 ring-gray-200 bg-gray-50 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-semibold text-gray-900">Resumen</div>
+              <div class="text-xs text-gray-600 mt-0.5">
+                ${count} fichaje${count !== 1 ? 's' : ''}${avg ? ` · Media: <span class="font-semibold">${avg.toFixed(2)}</span>` : ''}
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span title="Bien">${emojiFor(1)} <span class="text-gray-700">${dist[0]}</span></span>
+              <span title="Regular">${emojiFor(2)} <span class="text-gray-700">${dist[1]}</span></span>
+              <span title="Mal">${emojiFor(3)} <span class="text-gray-700">${dist[2]}</span></span>
+              <span title="Muy mal">${emojiFor(4)} <span class="text-gray-700">${dist[3]}</span></span>
+            </div>
+          </div>
+          <div class="text-xs text-gray-500 mt-2">
+            Tip: Si ves cambios fuertes, revisa “Hoy” vs “Ayer”.
+          </div>
+        </div>
+      `;
+            summary.classList.remove('hidden');
+
+            // --- Agrupar por fecha
+            const groups = new Map();
+            for (const r of rows) {
+                const key = r.fecha || 'Sin fecha';
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(r);
+            }
+
+            // Ordenar días desc (más reciente primero) si la fecha es yyyy-mm-dd
+            const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+                if (a === 'Sin fecha') return 1;
+                if (b === 'Sin fecha') return -1;
+                return a < b ? 1 : (a > b ? -1 : 0);
+            });
+
+            // Render
+            list.classList.remove('hidden');
+            list.innerHTML = sortedKeys.map(dateKey => {
+                const items = groups.get(dateKey) || [];
+
+                // Ordenar por hora desc si existe
+                items.sort((x, y) => (x.hora || '').localeCompare(y.hora || '')).reverse();
+
+                const header = formatDayHeader(dateKey);
+
+                return `
+          <li class="py-3">
+            <div class="sticky top-0 bg-white/80 backdrop-blur py-2">
+              <div class="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                ${header}
+                <span class="ml-2 text-[11px] font-normal text-gray-500">(${items.length})</span>
+              </div>
+            </div>
+
+            <div class="mt-2 space-y-2">
+              ${items.map(r => {
+                    const b = Number(r.bienestar);
+                    const emoji = emojiFor(b);
+                    const label = labelFor(b);
+                    const hora = r.hora || '—';
+
+                    return `
+                  <div class="flex items-center justify-between gap-3 rounded-xl ring-1 ring-gray-200 bg-white px-3 py-2">
+                    <div class="flex items-center gap-3">
+                      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ring-1 bg-gray-50">
+                        ${emoji}
+                      </span>
+                      <div class="leading-tight">
+                        <div class="text-sm font-semibold text-gray-900">${label}</div>
+                        <div class="text-xs text-gray-500">${dateKey} · ${hora}</div>
+                      </div>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                      Nivel ${b || '—'}
+                    </div>
+                  </div>
+                `;
+                }).join('')}
+            </div>
+          </li>
+        `;
+            }).join('');
+        })
+        .catch(() => {
+            loading.classList.add('hidden');
+            error.classList.remove('hidden');
+        });
+}
+
+function closeFichajesModal() {
+    const modal = document.getElementById('fichajesModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+// cerrar al clicar fuera
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('fichajesModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (e.target === modal) closeFichajesModal();
+});
+
+// cerrar con ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeFichajesModal();
+});
+
 function initBucketYearControl(){
     const wrap = document.getElementById('bucketYearWrap');
     const sel  = document.getElementById('bucketYear');

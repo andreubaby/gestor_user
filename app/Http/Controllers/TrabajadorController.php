@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
+use App\Models\Fichar;
 use App\Models\TrabajadorPolifonia;
 use App\Models\UsuarioVinculado;
 use App\Models\UserTrabajador; // ✅ modelo en mysql_trabajadores (tabla users)
@@ -75,5 +77,55 @@ class TrabajadorController extends Controller
         return back()
             ->with('success', 'Estado actualizado.')
             ->with('scroll_y', (int) $request->input('scroll_y', 0));
+    }
+
+    public function getFichajes(Request $r, int $trabajador){
+
+        $limit = (int) $r->query('limit', 100);
+        $limit = max(1, min($limit, 500)); // límite seguro
+
+        // 1) Obtener email del trabajador en Polifonía
+        $t = TrabajadorPolifonia::on('mysql_polifonia')->findOrFail($trabajador);
+        $email = mb_strtolower(trim($t->email ?? ''));
+
+        if ($email === '') {
+            return response()->json(['ok' => true, 'data' => []]);
+        }
+
+        // 2) Resolver user remoto del sistema de fichajes por email
+        $u = UserTrabajador::query()
+            ->select(['id', 'email'])
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
+
+        if (!$u) {
+            return response()->json(['ok' => true, 'data' => []]);
+        }
+
+        // 3) Traer fichajes usando fecha_hora (campo correcto de negocio)
+        $rows = Fichar::query()
+            ->select(['bienestar', 'fecha_hora'])
+            ->where('user_id', $u->id)
+            ->whereNotNull('fecha_hora')
+            ->orderBy('fecha_hora', 'desc')
+            ->limit($limit)
+            ->get()
+            ->map(function ($f) {
+                // fecha_hora puede venir como string => parse seguro
+                $dt = filled($f->fecha_hora) ? Carbon::parse($f->fecha_hora) : null;
+
+                return [
+                    'bienestar' => (int) ($f->bienestar ?? 0),
+                    'fecha'     => $dt?->format('Y-m-d'),
+                    'hora'      => $dt?->format('H:i'),
+                    'ts'        => $dt?->toIso8601String(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'ok' => true,
+            'data' => $rows,
+        ]);
     }
 }

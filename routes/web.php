@@ -75,6 +75,8 @@ Route::middleware('auth')->group(function () {
 
     // Export CSV (lo que estás viendo con filtros/orden)
     Route::get('/trabajadores/export', [UsuarioController::class, 'export'])->name('trabajadores.export');
+    Route::get('/trabajadores/{trabajador}/fichajes', [TrabajadorController::class, 'getFichajes'])
+        ->name('trabajadores.fichajes.get');
     // Toggle activo rápido
     Route::post('/trabajadores/{id}/toggle-activo', [TrabajadorController::class, 'toggleActivo'])->name('trabajadores.toggleActivo');
     Route::get('/usuarios/export/excel', [UsuarioController::class, 'exportExcel'])

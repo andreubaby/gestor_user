@@ -15,4 +15,11 @@ class Fichar extends Model
         'bienestar',
         'created_at',
     ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'fecha_hora' => 'datetime',
+        'fecha'      => 'date',
+    ];
 }
