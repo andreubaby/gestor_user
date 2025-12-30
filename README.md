@@ -1,66 +1,192 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Gestor de Usuarios Babyplant
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplicación **Laravel** para la **gestión centralizada de usuarios y trabajadores** en el ecosistema Babyplant. Permite **vincular, editar y visualizar** registros de una misma persona repartidos en **múltiples aplicaciones y bases de datos**, manteniendo coherencia de emails, credenciales y datos clave.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🧩 Objetivo del proyecto
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Unificar la gestión de usuarios que existen simultáneamente en distintos sistemas internos:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* Aplicación principal (usuarios)
+* Polifonía (trabajadores)
+* Plutón
+* Buscador (usuarios y trabajadores)
+* Cronos (fichajes)
+* Semillas
+* Store
+* Zeus
+* Fichajes / Bienestar
 
-## Learning Laravel
+El sistema permite **ver y editar todos los perfiles asociados desde una única vista**, evitando duplicidades y errores humanos.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## 🏗️ Stack tecnológico
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+* **Backend**: Laravel
+* **Frontend**: Blade + TailwindCSS + Alpine.js
+* **Base de datos**: MySQL (múltiples conexiones)
+* **Autenticación**: Laravel Auth
+* **Exportaciones**: Excel (maatwebsite/excel), PDF (dompdf)
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## 🗄️ Arquitectura de bases de datos
 
-### Premium Partners
+El proyecto trabaja con **varias conexiones MySQL**, definidas en `config/database.php`:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+| Sistema            | Conexión          |
+| ------------------ | ----------------- |
+| Usuarios principal | `mysql`           |
+| Polifonía          | `mysql_polifonia` |
+| Plutón             | `mysql_pluton`    |
+| Buscador           | `mysql_buscador`  |
+| Cronos             | `mysql_cronos`    |
+| Semillas           | `mysql_semillas`  |
+| Store              | `mysql_store`     |
+| Zeus               | `mysql_zeus`      |
+| Fichajes           | `mysql_fichajes`  |
 
-## Contributing
+La tabla **`usuario_vinculados`** actúa como **nexo central** mediante un `uuid`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 🔗 Vinculación de usuarios
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Cada persona puede existir en varios sistemas. El vínculo se gestiona mediante:
 
-## Security Vulnerabilities
+* `uuid` único
+* IDs opcionales por sistema (`usuario_id`, `trabajador_id`, `user_cronos_id`, etc.)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+El sistema permite:
 
-## License
+* Crear vínculos manuales
+* Editar vínculos existentes
+* Detectar usuarios no vinculados
+* Sugerir emails comunes
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## 🧑‍💻 Vista de edición unificada
+
+La vista **`usuarios/edit_unificado.blade.php`** es el núcleo visual del sistema.
+
+Características:
+
+* Carrusel interactivo (Alpine.js)
+* Una tarjeta por aplicación
+* Formularios independientes por sistema
+* Navegación por teclado (← → ESC)
+* Renderizado dinámico con `x-html`
+
+Cada tarjeta carga un **partial Blade**, por ejemplo:
+
+* `partials/form_usuario`
+* `partials/form_trabajador`
+* `partials/form_user_cronos`
+* `partials/form_user_fichajes`
+
+---
+
+## ⏱️ Fichajes y bienestar
+
+El sistema integra el módulo de **fichajes** con análisis de bienestar:
+
+* Bienestar diario (1–4)
+* Cálculo automático de la **media semanal**
+* Visualización de las **últimas 4 semanas**
+* Representación mediante iconos (caritas)
+* Popup con historial completo al pulsar
+
+Los datos se obtienen desde la tabla `fichar` del sistema Cronos/Fichajes.
+
+---
+
+## 🧾 Gestión de ausencias
+
+Desde Polifonía se gestionan:
+
+* Vacaciones (V)
+* Permisos (P)
+* Bajas (B)
+
+Características:
+
+* Cálculo por año natural o año de imputación
+* Rangos consecutivos
+* Arrastre automático de días consecutivos
+* Exportación a PDF oficial
+
+---
+
+## 📤 Exportaciones
+
+* **Excel**: listado de trabajadores Polifonía con filtros aplicados
+* **PDF**: certificados de vacaciones, permisos y bajas
+
+---
+
+## 🔐 Seguridad
+
+* CSRF activo
+* Validaciones estrictas en formularios
+* Contraseñas encriptadas con `Hash::make`
+* Separación clara entre sistemas
+
+---
+
+## ⚙️ Instalación
+
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+```
+
+Configura en `.env` todas las conexiones MySQL necesarias.
+
+---
+
+## 🚀 Uso recomendado
+
+1. Importar usuarios y trabajadores existentes
+2. Vincular registros mediante UUID
+3. Gestionar perfiles desde la vista unificada
+4. Usar Cronos/Fichajes como fuente de bienestar
+
+---
+
+## 📌 Notas importantes
+
+* El sistema **no obliga** a que todos los módulos existan
+* El email es el principal fallback de identificación
+* La arquitectura está preparada para añadir nuevos sistemas
+
+---
+
+## 🧠 Filosofía del proyecto
+
+> *Una persona, múltiples sistemas, una única verdad operativa.*
+
+Este gestor elimina fricción, errores y duplicidades en entornos con múltiples aplicaciones heredadas.
+
+---
+
+## 👨‍💻 Autor / Equipo
+
+Proyecto interno Babyplant.
+
+Desarrollado con foco en **robustez**, **claridad** y **escalabilidad**.
+
+---
+
+Si necesitas:
+
+* README más técnico
+* Diagrama de arquitectura
+* Documentación por controlador
+* Onboarding para nuevos devs
+
+👉 dímelo y lo ampliamos.
