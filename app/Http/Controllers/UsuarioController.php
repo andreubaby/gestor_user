@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserFichaje;
 use App\Models\TrabajadorDia;
 use App\Models\UserCronos;
 use App\Models\UserSemillas;
@@ -287,6 +288,16 @@ class UsuarioController extends Controller
             abort(404, 'No se encontró ningún registro.');
         }
 
+        $userFichaje = null;
+
+        if (!empty($email)) {
+            $emailKey = mb_strtolower(trim((string)$email));
+
+            if ($emailKey !== '') {
+                $userFichaje = UserFichaje::whereRaw('LOWER(email) = ?', [$emailKey])->first();
+            }
+        }
+
         // Buscar vínculo si es que existe
         $vinculo = UsuarioVinculado::where(function ($q) use ($usuario, $trabajador, $usuarioPluton) {
             if ($usuario)       $q->orWhere('usuario_id', $usuario->id);
@@ -312,7 +323,8 @@ class UsuarioController extends Controller
             'usuarioSemillas',
             'usuarioStore',
             'usuarioZeus',
-            'vinculo'
+            'vinculo',
+            'userFichaje'
         ));
     }
 
@@ -537,20 +549,51 @@ class UsuarioController extends Controller
         $userStore          = UserStore::on('mysql_store')->find($vinculo->user_store_id);
         $userZeus           = UserZeus::on('mysql_zeus')->find($vinculo->user_zeus_id);
 
+        // ✅ NUEVO: Usuario Fichajes (mysql_fichajes)
+        // 1) si más adelante guardas el id en el vínculo -> úsalo
+        $userFichaje = null;
+
+        if (!empty($vinculo->user_fichaje_id ?? null)) {
+            $userFichaje = UserFichaje::on('mysql_fichajes')->find($vinculo->user_fichaje_id);
+        }
+
+        // 2) fallback por email (recomendado mientras no exista el campo en vinculos)
+        if (!$userFichaje) {
+            $email = mb_strtolower(trim(
+                $usuario?->email
+                ?? $trabajador?->email
+                ?? $usuarioPluton?->email
+                ?? $usuarioBuscador?->email
+                ?? $trabajadorBuscador?->email
+                ?? $userCronos?->email
+                ?? $userSemillas?->email
+                ?? $userStore?->email
+                ?? $userZeus?->email
+                ?? ''
+            ));
+
+            if ($email !== '') {
+                $userFichaje = UserFichaje::on('mysql_fichajes')
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->first();
+            }
+        }
+
         return view('usuarios.edit_unificado', [
             'usuario'            => $usuario,
             'trabajador'         => $trabajador,
             'usuarioPluton'      => $usuarioPluton,
             'usuarioBuscador'    => $usuarioBuscador,
             'trabajadorBuscador' => $trabajadorBuscador,
-            'userCronos'         => $userCronos ,
+            'userCronos'         => $userCronos,
             'userSemillas'       => $userSemillas,
             'userStore'          => $userStore,
             'userZeus'           => $userZeus,
+            'userFichaje'        => $userFichaje,
+
             'vinculo'            => $vinculo,
         ]);
     }
-
     public function exportExcel(Request $request)
     {
         // reutiliza tus filtros actuales

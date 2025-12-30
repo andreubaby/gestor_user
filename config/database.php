@@ -166,6 +166,19 @@ return [
             'strict' => true,
         ],
 
+        'mysql_fichajes' => [
+            'driver' => 'mysql',
+            'host' => env('DB11_HOST', 'db11'),
+            'port' => env('DB11_PORT', '3306'),
+            'database' => env('DB11_DATABASE', 'fichar'),
+            'username' => env('DB11_USERNAME', 'cronos'),
+            'password' => env('DB11_PASSWORD', '1234'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

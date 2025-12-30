@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FichajeController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
 use App\Http\Controllers\UserSemillasController;
@@ -72,6 +73,12 @@ Route::middleware('auth')->group(function () {
     // 🛰️ USUARIOS PLUTÓN
     Route::put('/pluton/{pluton}', [UserPlutonController::class, 'update'])->name('pluton.update');
     Route::get('/pluton/{pluton}/edit', [UserPlutonController::class, 'edit'])->name('pluton.edit');
+
+    Route::get('/fichajes/{trabajador}/edit', [FichajeController::class, 'edit'])->name('fichajes.edit');
+    Route::put('/fichajes/{trabajador}', [FichajeController::class, 'update'])->name('fichajes.update');
+
+    // opcional modal historial
+    Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
 
     // Export CSV (lo que estás viendo con filtros/orden)
     Route::get('/trabajadores/export', [UsuarioController::class, 'export'])->name('trabajadores.export');
