@@ -129,10 +129,13 @@
     $userBuscadorSeleccionado   = $val('user_buscador_id', optional($vinculo)->user_buscador_id);
     $workerBuscadorSeleccionado = $val('worker_buscador_id', optional($vinculo)->worker_buscador_id);
 
-    $userCronosSeleccionado   = $val('user_cronos_id', null);
-    $userSemillasSeleccionado = $val('user_semillas_id', null);
-    $userStoreSeleccionado    = $val('user_store_id', null);
-    $userZeusSeleccionado     = $val('user_zeus_id', null);
+    $userCronosSeleccionado   = $val('user_cronos_id', optional($vinculo)->user_cronos_id);
+    $userSemillasSeleccionado = $val('user_semillas_id', optional($vinculo)->user_semillas_id);
+    $userStoreSeleccionado    = $val('user_store_id', optional($vinculo)->user_store_id);
+    $userZeusSeleccionado     = $val('user_zeus_id', optional($vinculo)->user_zeus_id);
+
+    // ✅ NUEVO: Fichajes
+    $userFichajeSeleccionado  = $val('user_fichaje_id', optional($vinculo)->user_fichaje_id);
 
     $emailSugerido = session('email_preseleccionado') ?? ($emailSugerido ?? null);
 
@@ -359,6 +362,19 @@
                                 </option>
                             @endforeach
                         </x-select-field>
+
+                        {{-- ✅ NUEVO: Fichajes --}}
+                        @if(isset($userFichajes))
+                            <x-select-field name="user_fichaje_id" label="Usuario (Fichajes)" placeholder="-- Selecciona un usuario fichajes --" class="ts">
+                                @foreach($userFichajes as $uf)
+                                    <option value="{{ $uf->id }}"
+                                            {{ (string)$userFichajeSeleccionado === (string)$uf->id ? 'selected' : '' }}
+                                            data-email="{{ mb_strtolower(trim($uf->email ?? '')) }}">
+                                        {{ $uf->name }} - {{ $uf->email }} - {{ $uf->work_mode ?? '—' }}
+                                    </option>
+                                @endforeach
+                            </x-select-field>
+                        @endif
 
                     </div>
                 </section>
