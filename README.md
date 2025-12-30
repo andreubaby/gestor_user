@@ -179,14 +179,3 @@ Este gestor elimina fricción, errores y duplicidades en entornos con múltiples
 Proyecto interno Babyplant.
 
 Desarrollado con foco en **robustez**, **claridad** y **escalabilidad**.
-
----
-
-Si necesitas:
-
-* README más técnico
-* Diagrama de arquitectura
-* Documentación por controlador
-* Onboarding para nuevos devs
-
-👉 dímelo y lo ampliamos.
