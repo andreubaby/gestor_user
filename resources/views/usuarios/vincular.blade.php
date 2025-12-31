@@ -364,9 +364,12 @@
                         </x-select-field>
 
                         {{-- ✅ NUEVO: Fichajes --}}
-                        @if(isset($userFichajes))
-                            <x-select-field name="user_fichaje_id" label="Usuario (Fichajes)" placeholder="-- Selecciona un usuario fichajes --" class="ts">
-                                @foreach($userFichajes as $uf)
+                        @if(!empty($usuariosFichajes))
+                            <x-select-field name="user_fichaje_id"
+                                            label="Usuario (Fichajes)"
+                                            placeholder="-- Selecciona un usuario fichajes --"
+                                            class="ts">
+                                @foreach($usuariosFichajes as $uf)
                                     <option value="{{ $uf->id }}"
                                             {{ (string)$userFichajeSeleccionado === (string)$uf->id ? 'selected' : '' }}
                                             data-email="{{ mb_strtolower(trim($uf->email ?? '')) }}">
