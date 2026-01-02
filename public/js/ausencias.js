@@ -563,42 +563,6 @@ function debugSelection(){
     alert(`Seleccionados ${tab} (${arr.length}):\n` + arr.join('\n'));
 }
 
-function safeWorkerId(id) {
-    // Ajusta el regex a tu formato real (numérico, uuid, etc.)
-    const s = String(id ?? "");
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(s)) return null;
-    return s;
-}
-
-function safeYear(y) {
-    const n = Number(y);
-    if (!Number.isInteger(n)) return null;
-    // Ajusta rango según tu negocio
-    if (n < 2000 || n > 2100) return null;
-    return n;
-}
-
-function buildSafeAppUrl(pathOrUrl, params = {}) {
-    // Fuerza a que sea URL de TU origen.
-    // Si pathOrUrl es absoluta, la “anclamos” y luego validamos origin.
-    const u = new URL(pathOrUrl, window.location.origin);
-
-    // ✅ Bloquea redirects a otros dominios
-    if (u.origin !== window.location.origin) return null;
-
-    // ✅ (Opcional pero recomendable) Allowlist de rutas
-    // Ajusta a tu endpoint real (ej. "/ausencias/pdf/vacaciones/...")
-    const allowedPrefixes = ["/"]; // pon aquí rutas concretas si puedes
-    if (!allowedPrefixes.some(p => u.pathname.startsWith(p))) return null;
-
-    // Añade params de forma segura
-    Object.entries(params).forEach(([k, v]) => {
-        if (v !== null && v !== undefined) u.searchParams.set(k, String(v));
-    });
-
-    return u.toString();
-}
-
 function renderVacPdfButtons() {
     const wrap = document.getElementById("vacPdfWrap");
     const box = document.getElementById("vacPdfButtons");
