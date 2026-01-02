@@ -373,14 +373,36 @@ async function saveRangeToServer({workerId, year, tab, from, to, mode}) {
     return true;
 }
 
-function downloadCalendarPdf(){
+function downloadCalendarPdf() {
     const tipo = tabToTipo(AUS.tab);
-    const routeKey = (tipo === 'V') ? 'pdfVac' : (tipo === 'P') ? 'pdfPer' : 'pdfBaj';
-    const urlBase = window.APP.routes[routeKey].replace('__ID__', AUS.workerId);
 
-    // OJO: el PDF debe ir con el AÑO DE ASIGNACIÓN, no el visual
-    const url = `${urlBase}?vacation_year=${encodeURIComponent(AUS.bucketYear)}&tipo=${encodeURIComponent(tipo)}`;
-    window.open(url, '_blank', 'noopener');
+    // 1) Validar tipo (whitelist)
+    if (!['V', 'P', 'B'].includes(tipo)) return;
+
+    // 2) Validar workerId (solo números)
+    const workerId = String(AUS.workerId ?? '').trim();
+    if (!/^\d+$/.test(workerId)) return;
+
+    // 3) Validar bucketYear (solo año razonable)
+    const bucketYear = Number(AUS.bucketYear);
+    if (!Number.isInteger(bucketYear) || bucketYear < 2000 || bucketYear > 2100) return;
+
+    const routeKey = (tipo === 'V') ? 'pdfVac' : (tipo === 'P') ? 'pdfPer' : 'pdfBaj';
+    const template = window?.APP?.routes?.[routeKey];
+    if (!template) return;
+
+    // 4) Construir URL segura con URL() y forzar same-origin
+    const urlBaseStr = template.replace('__ID__', workerId);
+    const u = new URL(urlBaseStr, window.location.origin);
+
+    // Si por lo que sea el template trajera un dominio externo, lo bloqueamos
+    if (u.origin !== window.location.origin) return;
+
+    // 5) Query params con URLSearchParams (evita concatenación insegura)
+    u.searchParams.set('vacation_year', String(bucketYear));
+    u.searchParams.set('tipo', tipo);
+
+    window.open(u.toString(), '_blank', 'noopener,noreferrer');
 }
 
 function renderMonthGrid(gridEl, year, month, busyMap, tab){
