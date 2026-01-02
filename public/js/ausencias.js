@@ -188,18 +188,42 @@ function countDaysInItems(items){
     return set.size;
 }
 
-function updateTabBadges(){
+function toSafeInt(value) {
+    const n = Number(value);
+    // Si no es número finito, evita inyectar cosas raras
+    if (!Number.isFinite(n)) return 0;
+    // Opcional: evita negativos y decimales
+    return Math.max(0, Math.trunc(n));
+}
+
+function setTabBadge(tabEl, icon, label, rawCount) {
+    if (!tabEl) return;
+
+    const count = toSafeInt(rawCount);
+
+    // Limpia el contenido previo sin usar innerHTML
+    tabEl.replaceChildren();
+
+    // Texto principal (icono + label)
+    tabEl.append(document.createTextNode(`${icon} ${label} `));
+
+    // Badge
+    const span = document.createElement("span");
+    span.className =
+        "ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-black/10";
+    span.textContent = String(count);
+
+    tabEl.append(span);
+}
+
+function updateTabBadges() {
     const vacBack = countDaysInItems(AUS.data?.vacaciones?.items);
     const perBack = countDaysInItems(AUS.data?.permiso?.items);
     const bajBack = countDaysInItems(AUS.data?.baja?.items);
 
-    const tabVac = document.getElementById('tabVac');
-    const tabPer = document.getElementById('tabPer');
-    const tabBaj = document.getElementById('tabBaj');
-
-    if (tabVac) tabVac.innerHTML = `🏖 Vacaciones <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-black/10">${vacBack}</span>`;
-    if (tabPer) tabPer.innerHTML = `📝 Permisos <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-black/10">${perBack}</span>`;
-    if (tabBaj) tabBaj.innerHTML = `🏥 Bajas <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-white/70 ring-1 ring-black/10">${bajBack}</span>`;
+    setTabBadge(document.getElementById("tabVac"), "🏖", "Vacaciones", vacBack);
+    setTabBadge(document.getElementById("tabPer"), "📝", "Permisos", perBack);
+    setTabBadge(document.getElementById("tabBaj"), "🏥", "Bajas", bajBack);
 }
 
 function applyTabStyles(){
@@ -539,137 +563,230 @@ function debugSelection(){
     alert(`Seleccionados ${tab} (${arr.length}):\n` + arr.join('\n'));
 }
 
-function renderVacPdfButtons(){
-    const wrap = document.getElementById('vacPdfWrap');
-    const box  = document.getElementById('vacPdfButtons');
+function safeWorkerId(id) {
+    // Ajusta el regex a tu formato real (numérico, uuid, etc.)
+    const s = String(id ?? "");
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(s)) return null;
+    return s;
+}
+
+function safeYear(y) {
+    const n = Number(y);
+    if (!Number.isInteger(n)) return null;
+    // Ajusta rango según tu negocio
+    if (n < 2000 || n > 2100) return null;
+    return n;
+}
+
+function buildSafeAppUrl(pathOrUrl, params = {}) {
+    // Fuerza a que sea URL de TU origen.
+    // Si pathOrUrl es absoluta, la “anclamos” y luego validamos origin.
+    const u = new URL(pathOrUrl, window.location.origin);
+
+    // ✅ Bloquea redirects a otros dominios
+    if (u.origin !== window.location.origin) return null;
+
+    // ✅ (Opcional pero recomendable) Allowlist de rutas
+    // Ajusta a tu endpoint real (ej. "/ausencias/pdf/vacaciones/...")
+    const allowedPrefixes = ["/"]; // pon aquí rutas concretas si puedes
+    if (!allowedPrefixes.some(p => u.pathname.startsWith(p))) return null;
+
+    // Añade params de forma segura
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== null && v !== undefined) u.searchParams.set(k, String(v));
+    });
+
+    return u.toString();
+}
+
+function renderVacPdfButtons() {
+    const wrap = document.getElementById("vacPdfWrap");
+    const box = document.getElementById("vacPdfButtons");
     if (!wrap || !box) return;
 
-    // Solo visible en tab vacaciones
-    if (AUS.tab !== 'vacaciones'){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (AUS.tab !== "vacaciones") {
+        wrap.classList.add("hidden");
+        box.replaceChildren(); // evita innerHTML
         return;
     }
 
     const items = AUS.data?.vacaciones?.items || [];
-    if (!items.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!items.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     // calcula primer y último día real de vacaciones
     const days = new Set();
-    items.forEach(it => {
-        const from = it.from ?? it.fecha;
-        const to   = it.to   ?? it.fecha;
-        if (!from) return;
+    items.forEach((it) => {
+        const from0 = it.from ?? it.fecha;
+        const to0 = it.to ?? it.fecha;
+        if (!from0) return;
 
-        const s = parseISO(from);
-        const e = parseISO(to || from);
+        const s = parseISO(from0);
+        const e = parseISO(to0 || from0);
         if (!s || !e) return;
 
         const cur = new Date(s.getTime());
-        while (cur <= e){
-            days.add(formatDate(cur.getFullYear(), cur.getMonth()+1, cur.getDate()));
+        while (cur <= e) {
+            days.add(formatDate(cur.getFullYear(), cur.getMonth() + 1, cur.getDate()));
             cur.setDate(cur.getDate() + 1);
         }
     });
 
     const sorted = Array.from(days).sort();
-    if (!sorted.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!sorted.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     const from = sorted[0];
-    const to   = sorted[sorted.length - 1];
+    const to = sorted[sorted.length - 1];
 
-    wrap.classList.remove('hidden');
-    box.innerHTML = '';
+    wrap.classList.remove("hidden");
+    box.replaceChildren();
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = "px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 transition";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className =
+        "px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 transition";
     btn.textContent = `📄 PDF (todas) (${fmtDM(from)}–${fmtDM(to)})`;
 
     btn.onclick = (ev) => {
         ev.stopPropagation();
 
-        const urlBase = window.APP.routes.pdfVac.replace('__ID__', AUS.workerId);
+        const wid = safeWorkerId(AUS.workerId);
+        const year = safeYear(AUS.bucketYear);
+        if (!wid || !year) return; // o muestra un toast/error
 
-        // 👇 no pases rangos aquí: que el backend coja TODOS los rangos del año
-        const url = `${urlBase}?vacation_year=${encodeURIComponent(AUS.bucketYear)}&tipo=V`;
-        window.open(url, '_blank', 'noopener');
+        // 1) NO confíes en que routes.pdfVac sea seguro
+        // 2) Reemplaza id ya validado
+        const rawBase = String(window.APP?.routes?.pdfVac ?? "");
+        const urlBase = rawBase.replace("__ID__", wid);
+
+        const finalUrl = buildSafeAppUrl(urlBase, {
+            vacation_year: year,
+            tipo: "V",
+        });
+
+        if (!finalUrl) return;
+
+        // Usar noopener/noreferrer para evitar tabnabbing
+        window.open(finalUrl, "_blank", "noopener,noreferrer");
     };
 
     box.appendChild(btn);
 }
 
-function renderPerPdfButtons(){
-    const wrap = document.getElementById('perPdfWrap');
-    const box  = document.getElementById('perPdfButtons');
+function safeWorkerId(id) {
+    const s = String(id ?? "");
+    // Ajusta a tu formato real (num, uuid, etc.)
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(s)) return null;
+    return s;
+}
+
+function safeYear(y) {
+    const n = Number(y);
+    if (!Number.isInteger(n)) return null;
+    if (n < 2000 || n > 2100) return null;
+    return n;
+}
+
+function buildSafeAppUrl(pathOrUrl, params = {}) {
+    const u = new URL(pathOrUrl, window.location.origin);
+
+    // Bloquea redirects fuera de tu dominio
+    if (u.origin !== window.location.origin) return null;
+
+    // (Opcional recomendable) limita rutas permitidas
+    // Ajusta esto al path real del endpoint de pdf permisos
+    // Ej: const allowedPrefixes = ["/ausencias/pdf/"];
+    const allowedPrefixes = ["/"];
+    if (!allowedPrefixes.some(p => u.pathname.startsWith(p))) return null;
+
+    for (const [k, v] of Object.entries(params)) {
+        if (v !== null && v !== undefined) u.searchParams.set(k, String(v));
+    }
+
+    return u.toString();
+}
+
+function renderPerPdfButtons() {
+    const wrap = document.getElementById("perPdfWrap");
+    const box  = document.getElementById("perPdfButtons");
     if (!wrap || !box) return;
 
     // Solo visible en tab permisos
-    if (AUS.tab !== 'permiso'){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (AUS.tab !== "permiso") {
+        wrap.classList.add("hidden");
+        box.replaceChildren(); // evita innerHTML
         return;
     }
 
     const items = AUS.data?.permiso?.items || [];
-    if (!items.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!items.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     // calcula primer y último día real de permisos
     const days = new Set();
     items.forEach(it => {
-        const from = it.from ?? it.fecha;
-        const to   = it.to   ?? it.fecha;
-        if (!from) return;
+        const from0 = it.from ?? it.fecha;
+        const to0   = it.to   ?? it.fecha;
+        if (!from0) return;
 
-        const s = parseISO(from);
-        const e = parseISO(to || from);
+        const s = parseISO(from0);
+        const e = parseISO(to0 || from0);
         if (!s || !e) return;
 
         const cur = new Date(s.getTime());
-        while (cur <= e){
-            days.add(formatDate(cur.getFullYear(), cur.getMonth()+1, cur.getDate()));
+        while (cur <= e) {
+            days.add(formatDate(cur.getFullYear(), cur.getMonth() + 1, cur.getDate()));
             cur.setDate(cur.getDate() + 1);
         }
     });
 
     const sorted = Array.from(days).sort();
-    if (!sorted.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!sorted.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     const from = sorted[0];
     const to   = sorted[sorted.length - 1];
 
-    wrap.classList.remove('hidden');
-    box.innerHTML = '';
+    wrap.classList.remove("hidden");
+    box.replaceChildren();
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = "px-3 py-2 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 transition";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className =
+        "px-3 py-2 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 transition";
     btn.textContent = `📄 PDF (todas) (${fmtDM(from)}–${fmtDM(to)})`;
 
     btn.onclick = (ev) => {
         ev.stopPropagation();
 
-        const urlBase = window.APP.routes.pdfPer.replace('__ID__', AUS.workerId);
+        const wid = safeWorkerId(AUS.workerId);
+        const year = safeYear(CAL.year);
+        if (!wid || !year) return;
 
-        // backend coge TODOS los rangos del año
-        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=P`;
-        window.open(url, '_blank', 'noopener');
+        const rawBase = String(window.APP?.routes?.pdfPer ?? "");
+        const urlBase = rawBase.replace("__ID__", wid);
+
+        const finalUrl = buildSafeAppUrl(urlBase, {
+            vacation_year: year,
+            tipo: "P",
+        });
+
+        if (!finalUrl) return;
+
+        window.open(finalUrl, "_blank", "noopener,noreferrer");
     };
 
     box.appendChild(btn);
