@@ -1,4 +1,4 @@
-FROM php:8.5.1-cli-alpine3.22
+FROM php:8.5.2RC1-cli-alpine3.22
 
 # Instalar dependencias del sistema (sin cron)
 RUN apt-get update && apt-get install -y \
