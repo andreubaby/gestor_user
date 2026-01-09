@@ -43,4 +43,9 @@ class UserFichaje extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function dailySummaries()
+    {
+        return $this->hasMany(Daily::class, 'user_id');
+    }
 }
