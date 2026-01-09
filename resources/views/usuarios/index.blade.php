@@ -654,6 +654,7 @@
             pdfPer:   @json(route('trabajadores.permisos.pdf',   ['trabajador' => '__ID__'])),
             pdfBaj:   @json(route('trabajadores.bajas.pdf',      ['trabajador' => '__ID__'])),
             fichajes: @json(route('trabajadores.fichajes.get', ['trabajador' => '__ID__'])),
+            fichajesUnificado: @json(route('usuarios.fichajes.unificado', ['trabajador' => '__ID__'])),
         },
         csrf: @json(csrf_token()),
     };
