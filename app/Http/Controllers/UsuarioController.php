@@ -16,6 +16,7 @@ use App\Models\UsuarioVinculado;
 use App\Models\WorkerBuscador;
 use App\Services\AusenciasService;
 use App\Services\CatalogosService;
+use App\Services\FichajesService;
 use App\Services\TrabajadoresIndexService;
 use App\Services\UsuarioLookupService;
 use App\Services\VinculacionService;
@@ -33,6 +34,7 @@ class UsuarioController extends Controller
         private readonly VinculacionService $vinculacion,
         private readonly CatalogosService $catalogos,
         private readonly AusenciasService $ausencias,
+        private readonly FichajesService $fichajesService,
     ) {}
 
     public function index(Request $request)
@@ -66,38 +68,84 @@ class UsuarioController extends Controller
     public function editUnificado($identificador)
     {
         $usuario = $trabajador = $usuarioPluton = null;
-        $usuarioBuscador = $trabajadorBuscador = null;
 
-        // ✅ unificar nombres con la vista
+        $usuarioBuscador = $trabajadorBuscador = null;
         $userCronos = $userSemillas = $userStore = $userZeus = null;
+
+        $vinculo = null;
+        $email = null;
+
+        // Helper para normalizar email
+        $normEmail = static function ($value) {
+            $v = mb_strtolower(trim((string) $value));
+            return $v !== '' ? $v : null;
+        };
 
         if (Str::isUuid($identificador)) {
             $vinculo = UsuarioVinculado::where('uuid', $identificador)->firstOrFail();
 
-            $usuario       = Usuario::find($vinculo->usuario_id);
-            $trabajador    = TrabajadorPolifonia::on('mysql_polifonia')->find($vinculo->trabajador_id);
-            $usuarioPluton = UserPluton::on('mysql_pluton')->find($vinculo->pluton_id);
+            // Principales por ID
+            $usuario       = $vinculo->usuario_id ? Usuario::find($vinculo->usuario_id) : null;
+            $trabajador    = $vinculo->trabajador_id ? TrabajadorPolifonia::on('mysql_polifonia')->find($vinculo->trabajador_id) : null;
+            $usuarioPluton = $vinculo->pluton_id ? UserPluton::on('mysql_pluton')->find($vinculo->pluton_id) : null;
 
-            $email = $usuario?->email ?? $trabajador?->email ?? $usuarioPluton?->email;
+            // ✅ Satélites por IDs DEL VÍNCULO (no por email)
+            $usuarioBuscador = !empty($vinculo->user_buscador_id)
+                ? UserBuscador::on('mysql_buscador')->find($vinculo->user_buscador_id)
+                : null;
+
+            $trabajadorBuscador = !empty($vinculo->worker_buscador_id)
+                ? WorkerBuscador::on('mysql_buscador')->find($vinculo->worker_buscador_id)
+                : null;
+
+            $userCronos = !empty($vinculo->user_cronos_id)
+                ? UserCronos::on('mysql_cronos')->find($vinculo->user_cronos_id)
+                : null;
+
+            $userSemillas = !empty($vinculo->user_semillas_id)
+                ? UserSemillas::on('mysql_semillas')->find($vinculo->user_semillas_id)
+                : null;
+
+            $userStore = !empty($vinculo->user_store_id)
+                ? UserStore::on('mysql_store')->find($vinculo->user_store_id)
+                : null;
+
+            $userZeus = !empty($vinculo->user_zeus_id)
+                ? UserZeus::on('mysql_zeus')->find($vinculo->user_zeus_id)
+                : null;
+
+            // Email solo como sugerencia/fallback para búsquedas (y para Fichajes si no hay ID)
+            $email = $normEmail($usuario?->email ?? $trabajador?->email ?? $usuarioPluton?->email);
+
         } else {
-            $email = strtolower($identificador);
+            // Lookup por email (cuando NO hay UUID / vínculo directo)
+            $email = $normEmail($identificador);
 
-            $usuario       = Usuario::whereRaw('LOWER(email) = ?', [$email])->first();
-            $trabajador    = TrabajadorPolifonia::whereRaw('LOWER(email) = ?', [$email])->first();
-            $usuarioPluton = UserPluton::whereRaw('LOWER(email) = ?', [$email])->first();
+            $usuario       = $email ? Usuario::whereRaw('LOWER(email) = ?', [$email])->first() : null;
+            $trabajador    = $email ? TrabajadorPolifonia::whereRaw('LOWER(email) = ?', [$email])->first() : null;
+            $usuarioPluton = $email ? UserPluton::whereRaw('LOWER(email) = ?', [$email])->first() : null;
+
+            if ($email) {
+                $usuarioBuscador    = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+                $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+
+                $userCronos   = UserCronos::on('mysql_cronos')->whereRaw('LOWER(email) = ?', [$email])->first();
+                $userSemillas = UserSemillas::on('mysql_semillas')->whereRaw('LOWER(email) = ?', [$email])->first();
+                $userStore    = UserStore::on('mysql_store')->whereRaw('LOWER(email) = ?', [$email])->first();
+                $userZeus     = UserZeus::on('mysql_zeus')->whereRaw('LOWER(email) = ?', [$email])->first();
+            }
         }
 
-        if (!empty($email)) {
-            $usuarioBuscador    = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
-
-            // ✅ ahora con nombres que tu blade ya usa
-            $userCronos   = UserCronos::on('mysql_cronos')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $userSemillas = UserSemillas::on('mysql_semillas')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $userStore    = UserStore::on('mysql_store')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $userZeus     = UserZeus::on('mysql_zeus')->whereRaw('LOWER(email) = ?', [$email])->first();
+        // Si no vino por UUID, intenta localizar vínculo por IDs conocidos (como ya hacías)
+        if (!$vinculo) {
+            $vinculo = UsuarioVinculado::where(function ($q) use ($usuario, $trabajador, $usuarioPluton) {
+                if ($usuario)       $q->orWhere('usuario_id', $usuario->id);
+                if ($trabajador)    $q->orWhere('trabajador_id', $trabajador->id);
+                if ($usuarioPluton) $q->orWhere('pluton_id', $usuarioPluton->id);
+            })->first();
         }
 
+        // Si no hay nada, 404
         if (
             !$usuario && !$trabajador && !$usuarioPluton &&
             !$usuarioBuscador && !$trabajadorBuscador &&
@@ -106,13 +154,7 @@ class UsuarioController extends Controller
             abort(404, 'No se encontró ningún registro.');
         }
 
-        // vínculo
-        $vinculo = UsuarioVinculado::where(function ($q) use ($usuario, $trabajador, $usuarioPluton) {
-            if ($usuario)       $q->orWhere('usuario_id', $usuario->id);
-            if ($trabajador)    $q->orWhere('trabajador_id', $trabajador->id);
-            if ($usuarioPluton) $q->orWhere('pluton_id', $usuarioPluton->id);
-        })->first();
-
+        // Si no hay vínculo, manda a vincular con preselección (igual que antes)
         if (!$vinculo) {
             return redirect()->route('usuarios.vincular')
                 ->with('usuario_preseleccionado', $usuario?->id)
@@ -121,13 +163,21 @@ class UsuarioController extends Controller
                 ->with('email_preseleccionado', $email);
         }
 
-        // Fichajes por email (como ya hacías)
+        // ✅ Fichajes: preferir ID del vínculo si existe; si no, fallback por email
         $userFichaje = null;
-        if (!empty($email)) {
-            $emailKey = mb_strtolower(trim((string)$email));
-            if ($emailKey !== '') {
-                $userFichaje = UserFichaje::whereRaw('LOWER(email) = ?', [$emailKey])->first();
-            }
+        if (!empty($vinculo->user_fichaje_id)) {
+            $userFichaje = UserFichaje::find($vinculo->user_fichaje_id);
+        } elseif ($email) {
+            $userFichaje = UserFichaje::whereRaw('LOWER(email) = ?', [$email])->first();
+        }
+
+        // ✅ NUEVO: traer daily_summaries para mostrar en el módulo fichajes
+        $fichajesDaily = collect();
+        if ($userFichaje) {
+            // opcional: rango por querystring
+            $from = request('from'); // YYYY-MM-DD
+            $to   = request('to');   // YYYY-MM-DD
+            $fichajesDaily = $this->fichajesService->getDailySummaries($userFichaje, $from, $to);
         }
 
         return view('usuarios.edit_unificado', compact(
@@ -141,7 +191,8 @@ class UsuarioController extends Controller
             'userStore',
             'userZeus',
             'vinculo',
-            'userFichaje'
+            'userFichaje',
+            'fichajesDaily'
         ));
     }
 
@@ -208,7 +259,6 @@ class UsuarioController extends Controller
             'user_store_id' => 'nullable|integer',
             'user_zeus_id' => 'nullable|integer',
 
-            // ✅ NUEVO: Fichajes
             'user_fichaje_id' => 'nullable|integer',
         ]);
 
@@ -246,7 +296,6 @@ class UsuarioController extends Controller
             'user_store_id' => 'nullable|integer',
             'user_zeus_id' => 'nullable|integer',
 
-            // ✅ NUEVO: Fichajes
             'user_fichaje_id' => 'nullable|integer',
         ]);
 

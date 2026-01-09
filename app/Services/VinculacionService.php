@@ -20,6 +20,7 @@ class VinculacionService
             'user_semillas_preseleccionado',
             'user_store_preseleccionado',
             'user_zeus_preseleccionado',
+            'user_fichaje_preseleccionado',
             'email_preseleccionado',
         ]);
     }
@@ -35,6 +36,7 @@ class VinculacionService
             ['key' => 'user_semillas_id',   'conn' => 'mysql_semillas',  'table' => 'users',        'msg' => 'El usuario no existe en Semillas'],
             ['key' => 'user_store_id',      'conn' => 'mysql_store',     'table' => 'users',        'msg' => 'El usuario no existe en Store'],
             ['key' => 'user_zeus_id',       'conn' => 'mysql_zeus',      'table' => 'users',        'msg' => 'El usuario no existe en Zeus'],
+            ['key' => 'user_fichaje_id',    'conn' => 'mysql_fichajes',  'table' => 'users',        'msg' => 'El usuario no existe en Fichajes'],
         ];
 
         $errors = [];
@@ -66,6 +68,7 @@ class VinculacionService
                 'user_semillas_id'   => $data['user_semillas_id'] ?? null,
                 'user_store_id'      => $data['user_store_id'] ?? null,
                 'user_zeus_id'       => $data['user_zeus_id'] ?? null,
+                'user_fichaje_id'    => $data['user_fichaje_id'] ?? null,
             ]
         );
     }
