@@ -137,7 +137,10 @@
     // ✅ NUEVO: Fichajes
     $userFichajeSeleccionado  = $val('user_fichaje_id', optional($vinculo)->user_fichaje_id);
 
-    $emailSugerido = session('email_preseleccionado') ?? ($emailSugerido ?? null);
+    $emailSugerido = old('email_search')
+    ?? request('email')
+    ?? session('email_preseleccionado')
+    ?? ($emailSugerido ?? null);
 
     $action = $vinculo
         ? route('usuarios.vincular.update', $vinculo->id)
@@ -211,13 +214,14 @@
                     <div class="md:col-span-7">
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Buscar por email (opcional)</label>
                         <input id="emailSearch"
+                               name="email_search"
                                type="email"
                                inputmode="email"
                                autocomplete="off"
                                value="{{ $emailSugerido ?? '' }}"
                                placeholder="ej: usuario@dominio.com"
                                class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
-                                      focus:outline-none focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400">
+                                focus:outline-none focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400">
                     </div>
 
                     <div class="md:col-span-5 flex gap-2">

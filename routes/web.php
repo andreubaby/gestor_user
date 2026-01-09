@@ -76,7 +76,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/fichajes/{trabajador}/edit', [FichajeController::class, 'edit'])->name('fichajes.edit');
     Route::put('/fichajes/{trabajador}', [FichajeController::class, 'update'])->name('fichajes.update');
-
+    Route::get('/usuarios/{trabajador}/fichajes-unificado', [FichajeController::class, 'fichajesUnificado'])
+        ->name('usuarios.fichajes.unificado');
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
 

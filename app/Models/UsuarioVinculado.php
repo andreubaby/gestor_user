@@ -19,7 +19,8 @@ class UsuarioVinculado extends Model
         'user_cronos_id',
         'user_semillas_id',
         'user_store_id',
-        'user_zeus_id'
+        'user_zeus_id',
+        'user_fichaje_id',
     ];
 
     public function usuario()

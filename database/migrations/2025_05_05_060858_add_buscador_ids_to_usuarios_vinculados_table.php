@@ -18,13 +18,14 @@ return new class extends Migration
             $table->unsignedBigInteger('user_semillas_id')->nullable()->after('user_buscador_id');
             $table->unsignedBigInteger('user_store_id')->nullable()->after('user_cronos_id');
             $table->unsignedBigInteger('user_zeus_id')->nullable()->after('user_store_id');
+            $table->unsignedBigInteger('user_fichaje_id')->nullable()->after('user_zeus_id');
         });
     }
 
     public function down()
     {
         Schema::table('usuarios_vinculados', function (Blueprint $table) {
-            $table->dropColumn(['user_buscador_id', 'worker_buscador_id', 'user_cronos_id', 'user_semillas_id','user_store_id', 'user_zeus_id']);
+            $table->dropColumn(['user_buscador_id', 'worker_buscador_id', 'user_cronos_id', 'user_semillas_id','user_store_id', 'user_zeus_id', 'user_fichaje_id']);
         });
     }
 };
