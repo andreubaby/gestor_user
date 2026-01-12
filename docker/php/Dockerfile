@@ -1,47 +1,29 @@
-FROM php:8.5.2RC1-cli-alpine3.22
+FROM php:8.4-fpm
 
-# Instalar dependencias del sistema (sin cron)
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    curl \
-    git \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-        pdo_mysql \
-        mbstring \
-        zip \
-        exif \
-        pcntl \
-        gd \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    git unzip zip curl \
+    libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+    libonig-dev libxml2-dev libzip-dev \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg \
+ && docker-php-ext-install pdo_mysql mbstring zip exif pcntl gd \
+ && rm -rf /var/lib/apt/lists/*
 
-# Instalar Composer (desde imagen oficial)
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Directorio de trabajo
 WORKDIR /var/www/html
+COPY . .
 
-# Copiar archivos del proyecto
-COPY ../.. .
+# Evita "dubious ownership" + permisos correctos antes de composer
+RUN git config --global --add safe.directory /var/www/html \
+ && chown -R www-data:www-data /var/www/html
 
-# Instalar dependencias de Laravel
-RUN composer install --optimize-autoloader --no-dev
+# Instala deps (como root está bien; si quieres, luego cambias a www-data)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
+ && test -f /var/www/html/vendor/autoload.php
 
-# Permisos correctos para Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+ && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Exponer el puerto PHP-FPM
 EXPOSE 9000
-
-# Comando por defecto (php-fpm)
 CMD ["php-fpm"]
+
