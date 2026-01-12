@@ -7,6 +7,7 @@ use App\Models\UsuarioVinculado;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class TrabajadoresIndexService
 {
@@ -22,11 +23,12 @@ class TrabajadoresIndexService
         $sort   = $request->input('sort', 'nombre'); // nombre|email|activo|vinculado
         $dir    = $request->input('dir', 'asc');     // asc|desc
         $year   = (int) $request->input('vacation_year', date('Y'));
-
+        $grupo = $request->input('grupo'); // '' | null | 'ID'
         $todos = $this->buildCollection($search);
 
         $todos = $this->applyActivoFilter($todos, $activo);
         $todos = $this->applySearchFilter($todos, $search);
+        $todos = $this->applyGroupFilter($todos, $grupo);
 
         $dupEmails = $this->getDuplicatedEmails($todos);
 
@@ -45,6 +47,7 @@ class TrabajadoresIndexService
             'stats'     => $stats,
             'dupEmails' => $dupEmails,
             'year'      => $year,
+            'grupo' => $grupo,
         ];
     }
 
@@ -106,6 +109,38 @@ class TrabajadoresIndexService
         }
         return $todos->values();
     }
+
+    private function applyGroupFilter(Collection $todos, $grupo): Collection
+    {
+        if ($grupo === null || $grupo === '') {
+            return $todos->values();
+        }
+
+        $grupoId = (int) $grupo;
+        if ($grupoId <= 0) {
+            return $todos->values();
+        }
+
+        // Pivot en DB principal (mysql)
+        $ids = DB::connection('mysql')
+            ->table('group_trabajador')
+            ->where('group_id', $grupoId)
+            ->pluck('trabajador_id')
+            ->map(fn($v) => (int)$v)
+            ->values()
+            ->all();
+
+        // Si el grupo no tiene nadie -> lista vacía (sin romper nada)
+        if (empty($ids)) {
+            return collect();
+        }
+
+        // En tu colección todos son trabajadores (tipo trabajador) y tienen id
+        return $todos
+            ->filter(fn($r) => in_array((int)($r->id ?? 0), $ids, true))
+            ->values();
+    }
+
 
     private function getDuplicatedEmails(Collection $todos): array
     {

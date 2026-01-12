@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FichajeController;
+use App\Http\Controllers\GroupAssignmentController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
 use App\Http\Controllers\UserSemillasController;
@@ -104,6 +105,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/trabajadores/{trabajador}/pdf/bajas', [UsuarioController::class, 'vacaciones'])
         ->name('trabajadores.bajas.pdf');
+
+    Route::get('/groups/asignar', [GroupAssignmentController::class, 'create'])->name('groups.assign.create');
+    Route::post('/groups/asignar', [GroupAssignmentController::class, 'store'])->name('groups.assign.store');
+    Route::delete('/groups/asignar', [GroupAssignmentController::class, 'detach'])->name('groups.assign.detach');
     // 🚪 Cerrar sesión
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
