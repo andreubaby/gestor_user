@@ -82,6 +82,10 @@ Route::middleware('auth')->group(function () {
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
 
+    // routes/web.php
+    Route::get('/fichajes/diarios', [\App\Http\Controllers\FichajesDiariosController::class, 'index'])
+        ->name('fichajes.diarios.index');
+
     // Export CSV (lo que estás viendo con filtros/orden)
     Route::get('/trabajadores/export', [UsuarioController::class, 'export'])->name('trabajadores.export');
     Route::get('/trabajadores/{trabajador}/fichajes', [TrabajadorController::class, 'getFichajes'])
