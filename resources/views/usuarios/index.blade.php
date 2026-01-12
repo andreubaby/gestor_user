@@ -71,6 +71,12 @@
                 Vincular
             </a>
 
+            <a href="{{ route('groups.assign.create') }}"
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
+                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                Asignar grupo
+            </a>
+
             <a href="#"
                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 transition
@@ -159,6 +165,23 @@
                     </select>
                 </div>
 
+                <!-- Grupo -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Grupo</label>
+                    <select name="grupo"
+                            onchange="setLoading(true); this.form.submit()"
+                            class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
+                   focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
+                        <option value="">Todos</option>
+
+                        @foreach(($groups ?? []) as $g)
+                            <option value="{{ $g->id }}" {{ (string)request('grupo') === (string)$g->id ? 'selected' : '' }}>
+                                {{ $g->name ?? $g->nombre ?? ('Grupo '.$g->id) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <!-- Botón Buscar + Loading -->
                 <div class="md:col-span-2">
                     <div class="flex items-center gap-3">
@@ -175,7 +198,7 @@
 
                 <!-- Limpiar -->
                 <div class="md:col-span-2 md:flex md:justify-end">
-                    @if(request()->hasAny(['search','activo','sort','dir']))
+                    @if(request()->hasAny(['search','activo','grupo','sort','dir']))
                         <a href="{{ route('usuarios.index') }}"
                            class="inline-flex px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition">
                             Limpiar

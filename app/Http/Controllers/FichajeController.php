@@ -193,13 +193,29 @@ class FichajeController extends Controller
         $antiguos = $antiguosRaw->map(function ($r) {
             $dt = filled($r->fecha_hora) ? \Carbon\Carbon::parse($r->fecha_hora) : null;
 
+            $tipo = strtoupper(trim((string)($r->tipo ?? '')));
+
+            $origen = match ($tipo) {
+                'I' => 'entrada',
+                'F' => 'salida',
+                default => 'fichaje',
+            };
+
             return [
-                'origen'    => 'trabajadores',
+                'origen'    => $origen,
                 'fecha'     => optional($r->fecha)->format('Y-m-d')
                     ?? $dt?->format('Y-m-d')
                         ?? (string)($r->fecha ?? $r->fecha_hora),
+
                 'hora'      => $dt?->format('H:i'),
+
+                // ✅ evita (int)null => 0
                 'bienestar' => is_null($r->bienestar) ? null : (int)$r->bienestar,
+
+                // opcional: dejar info extra por si quieres depurar
+                'meta'      => [
+                    'tipo' => $r->tipo ?? null,
+                ],
             ];
         });
 

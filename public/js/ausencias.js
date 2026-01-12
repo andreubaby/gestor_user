@@ -1284,22 +1284,41 @@ function openFichajesModal(el) {
                                 ? ` · ${minsVal} min`
                                 : '';
 
+                            const origenNorm = String(r.origen || '').toLowerCase();
+
+// 🎨 Colores suaves por tipo (entrada/salida)
+                            const cardClass =
+                                origenNorm === 'entrada'
+                                    ? 'bg-emerald-50 ring-emerald-200'
+                                    : origenNorm === 'salida'
+                                        ? 'bg-red-50 ring-red-200'
+                                        : 'bg-white ring-gray-200';
+
+                            const badge =
+                                origenNorm === 'entrada'
+                                    ? `<span class="ml-2 inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[11px] font-semibold">Entrada</span>`
+                                    : origenNorm === 'salida'
+                                        ? `<span class="ml-2 inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-[11px] font-semibold">Salida</span>`
+                                        : '';
+
                             return `
-                                    <div class="flex items-center justify-between gap-3 rounded-xl ring-1 ring-gray-200 bg-white px-3 py-2">
-                                      <div class="flex items-center gap-3">
-                                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ring-1 bg-gray-50">
-                                          ${emoji}
-                                        </span>
-                                        <div class="leading-tight">
-                                          <div class="text-sm font-semibold text-gray-900">${label}</div>
-                                          <div class="text-xs text-gray-500">${dateKey} · ${hora} · ${origen}${mins}</div>
-                                        </div>
-                                      </div>
-                                      <div class="text-xs text-gray-500">
-                                        ${b ? `Nivel ${b}` : ''}
-                                      </div>
+                              <div class="flex items-center justify-between gap-3 rounded-xl ring-1 ${cardClass} px-3 py-2">
+                                <div class="flex items-center gap-3">
+                                  <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ring-1 bg-white/70">
+                                    ${emoji}
+                                  </span>
+                                  <div class="leading-tight">
+                                    <div class="text-sm font-semibold text-gray-900">
+                                      ${label} ${badge}
                                     </div>
-                                  `;
+                                    <div class="text-xs text-gray-500">${dateKey} · ${hora} · ${origen}${mins}</div>
+                                  </div>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                  ${b ? `Nivel ${b}` : ''}
+                                </div>
+                              </div>
+                            `;
                         }).join('')}
                             </div>
                           </li>

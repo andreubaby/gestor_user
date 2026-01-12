@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\TrabajadoresPolifoniaExport;
+use App\Models\Group;
 use App\Models\TrabajadorPolifonia;
 use App\Models\UserBuscador;
 use App\Models\UserCronos;
@@ -41,6 +42,12 @@ class UsuarioController extends Controller
     {
         $data = $this->indexService->handle($request);
 
+        // ✅ Para pintar el select (DB principal)
+        $groups = Group::query()
+            ->where('active', true)
+            ->orderBy('name')
+            ->get();
+
         return view('usuarios.index', [
             'agrupados' => $data['paginator'],
             'search'    => $data['search'],
@@ -50,6 +57,9 @@ class UsuarioController extends Controller
             'stats'     => $data['stats'],
             'dupEmails' => $data['dupEmails'],
             'year'      => $data['year'],
+
+            // ✅ NUEVO
+            'groups'    => $groups,
         ]);
     }
 
