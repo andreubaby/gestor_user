@@ -83,6 +83,17 @@
                 Vincular
             </a>
 
+            <a href="{{ route('fichajes.diarios.index') }}"
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                Fichajes diarios
+            </a>
+
+            <a href="{{ route('groups.assign.create') }}"
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
+                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                Asignar grupo
+            </a>
+
             <a href="#"
                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 transition
