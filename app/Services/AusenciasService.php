@@ -12,10 +12,11 @@ use Illuminate\Support\Facades\DB;
 
 class AusenciasService
 {
-    public function attachAusenciasPayload(Collection $items, int $vacationYear): Collection
+    public function attachAusenciasPayload(Collection $items, int $calendarYear): Collection
     {
-        return $items->map(function ($r) use ($vacationYear) {
-            $r->ausencias = $this->buildAusenciasPayload((int)$r->id, $vacationYear);
+        return $items->map(function ($r) use ($calendarYear) {
+            // ✅ IMPORTANTE: en el index queremos lo del AÑO CALENDARIO
+            $r->ausencias = $this->buildAusenciasPayloadByCalendarYear((int)$r->id, $calendarYear);
             return $r;
         });
     }
@@ -196,20 +197,50 @@ class AusenciasService
     private function formatPayload($rows, bool $includeBucketYear): array
     {
         $out = [
-            'vacaciones' => ['count'=>0,'items'=>[]],
-            'permiso'    => ['count'=>0,'items'=>[]],
-            'baja'       => ['count'=>0,'items'=>[]],
+            'vacaciones' => ['count' => 0, 'items' => []],
+            'permiso'    => ['count' => 0, 'items' => []],
+            'baja'       => ['count' => 0, 'items' => []],
+        ];
+
+        // sets para contar días únicos por tipo
+        $seen = [
+            'vacaciones' => [],
+            'permiso'    => [],
+            'baja'       => [],
         ];
 
         foreach ($rows as $r) {
             $key = $r->tipo === 'V' ? 'vacaciones' : ($r->tipo === 'P' ? 'permiso' : 'baja');
-            $item = ['fecha' => (string)$r->fecha];
-            if ($includeBucketYear) $item['bucket_year'] = (int)$r->vacation_year;
+
+            $fecha = is_string($r->fecha)
+                ? $r->fecha
+                : \Carbon\Carbon::parse($r->fecha)->format('Y-m-d');
+
+            // bucket_year solo si aplica
+            $bucket = $includeBucketYear ? (int)$r->vacation_year : null;
+
+            // clave única: por fecha (y si incluyes bucket, diferéncialo)
+            $uniqKey = $fecha; // ✅ contar siempre por día real (fecha)
+
+
+            // si ya está, saltar (evita duplicados)
+            if (isset($seen[$key][$uniqKey])) {
+                continue;
+            }
+            $seen[$key][$uniqKey] = true;
+
+            $item = ['fecha' => $fecha];
+            if ($includeBucketYear) $item['bucket_year'] = $bucket;
 
             $out[$key]['items'][] = $item;
-            $out[$key]['count']++;
         }
+
+        // count = nº de días únicos
+        $out['vacaciones']['count'] = count($seen['vacaciones']);
+        $out['permiso']['count']    = count($seen['permiso']);
+        $out['baja']['count']       = count($seen['baja']);
 
         return $out;
     }
+
 }
