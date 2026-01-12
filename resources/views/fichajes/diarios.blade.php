@@ -110,11 +110,12 @@
                 </select>
             </div>
 
-            <div class="md:col-span-3">
+            <div class="md:col-span-4">
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Estado</label>
                 <select name="estado"
+                        onchange="this.form.submit()"
                         class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
-                               focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
+                 focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
                     <option value="" {{ request('estado') === null || request('estado') === '' ? 'selected' : '' }}>Todos</option>
                     <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Activos</option>
                     <option value="inactivo" {{ request('estado') === 'inactivo' ? 'selected' : '' }}>Inactivos</option>
