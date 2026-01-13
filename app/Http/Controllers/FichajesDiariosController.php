@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Services\FichajesDiariosService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FichajesDiariosController extends Controller
 {
@@ -26,5 +27,10 @@ class FichajesDiariosController extends Controller
             'stats'       => $data['stats'],
             'groups'      => $groups,
         ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        return $this->service->exportExcel($request);
     }
 }
