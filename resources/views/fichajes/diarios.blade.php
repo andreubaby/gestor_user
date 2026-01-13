@@ -96,7 +96,15 @@
                               focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
             </div>
 
-            <div class="md:col-span-4">
+            {{-- ✅ NUEVO: Mes para export mensual (YYYY-MM) --}}
+            <div class="md:col-span-3">
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Mes (Excel)</label>
+                <input type="month" name="month" value="{{ request('month') ?? now()->format('Y-m') }}"
+                       class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
+                              focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
+            </div>
+
+            <div class="md:col-span-3">
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Grupo</label>
                 <select name="grupo"
                         class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
@@ -110,7 +118,7 @@
                 </select>
             </div>
 
-            <div class="md:col-span-4">
+            <div class="md:col-span-3">
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Estado</label>
                 <select name="estado"
                         onchange="this.form.submit()"
@@ -122,9 +130,9 @@
                 </select>
             </div>
 
-            <div class="md:col-span-2 flex gap-2">
+            <div class="md:col-span-12 flex flex-wrap gap-2">
                 <button type="submit"
-                        class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold
+                        class="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold
                                hover:bg-emerald-700 transition focus:outline-none focus:ring-4 focus:ring-emerald-200 shadow">
                     Ver
                 </button>
@@ -134,6 +142,19 @@
                           focus:outline-none focus:ring-4 focus:ring-slate-300/40">
                     Limpiar
                 </a>
+
+                {{-- ✅ NUEVO: Export Excel según filtros (grupo/estado + month) --}}
+                <a
+                    href="{{ route('fichajes.diarios.export', request()->query()) }}"
+                    class="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-semibold
+                           hover:bg-emerald-800 transition focus:outline-none focus:ring-4 focus:ring-emerald-200 shadow"
+                >
+                    ⬇️ Excel (según filtros)
+                </a>
+
+                <span class="text-xs text-slate-500 self-center">
+                    (genera 1 Excel, <span class="font-semibold">una hoja por trabajador</span>, por el mes elegido)
+                </span>
             </div>
         </form>
     </section>
@@ -213,6 +234,11 @@
                     // chips horas
                     $chipInClass  = $entrada ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
                     $chipOutClass = $salida  ? 'bg-red-100 text-red-700 ring-1 ring-red-200'           : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
+
+                    // ✅ params para export individual manteniendo filtros actuales
+                    $exportParams = array_merge(request()->query(), [
+                        'trabajador_id' => $r->trabajador_id ?? $r->id ?? null,
+                    ]);
                 @endphp
 
                 <tr class="transition hover:bg-emerald-50/40 {{ $rowTone }}"
@@ -221,6 +247,18 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-semibold text-slate-900">{{ $r->nombre }}</span>
+
+                            {{-- ✅ NUEVO: Excel individual (una hoja, ese trabajador, el mes elegido) --}}
+                            @if(!empty($exportParams['trabajador_id']))
+                                <a
+                                    href="{{ route('fichajes.diarios.export', $exportParams) }}"
+                                    class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold
+                                           bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+                                    title="Excel mensual de este trabajador"
+                                >
+                                    📄 Excel
+                                </a>
+                            @endif
 
                             @if(isset($r->activo))
                                 @if((int)$r->activo === 1)

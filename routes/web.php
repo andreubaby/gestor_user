@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FichajeController;
+use App\Http\Controllers\FichajesDiariosController;
 use App\Http\Controllers\GroupAssignmentController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
@@ -81,6 +82,9 @@ Route::middleware('auth')->group(function () {
         ->name('usuarios.fichajes.unificado');
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
+
+    Route::get('/fichajes-diarios/export', [FichajesDiariosController::class, 'export'])
+        ->name('fichajes.diarios.export');
 
     // routes/web.php
     Route::get('/fichajes/diarios', [\App\Http\Controllers\FichajesDiariosController::class, 'index'])
