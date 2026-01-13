@@ -414,8 +414,8 @@ class FichajesDiariosService
                 $firstIn = optional($dayPunches->firstWhere('type', 'in'))['datetime'] ?? null;
                 $lastOut = optional($dayPunches->reverse()->firstWhere('type', 'out'))['datetime'] ?? null;
 
-                $shiftType = $t->turno ?? 'office'; // o donde lo tengas (campaign/office/intensive)
-                $worked = $this->calcWorkedMinutesWithBreaks($dayPunches, $shiftType);
+                $shiftType = $t->turno ?? 'office'; // campaign/office/intensive
+                $worked = $this->calcWorkedMinutesWithBreaks($dayPunches, $shiftType); // ✅ aquí ya aplica la regla campaign sin comida si acaban <= 16:00
                 $totalMinutes += $worked;
 
                 $origins = $dayPunches->pluck('origen')->unique()->values()->all();
@@ -453,7 +453,6 @@ class FichajesDiariosService
                 ->value('name');
 
             if ($groupName) {
-                // limpiar para nombre de archivo
                 $groupName = strtolower($groupName);
                 $groupName = preg_replace('/[^a-z0-9_-]+/i', '_', $groupName);
                 $groupName = trim($groupName, '_');
@@ -467,7 +466,7 @@ class FichajesDiariosService
         }
 
         if ($groupId) {
-            $fileName .= '_grupo_'.($groupName ?: $groupId);
+            $fileName .= '_grupo_'.($groupName ?: $groupId); // ✅ ahora sale injerto en vez de 1 si existe nombre
         }
 
         $fileName .= '.xlsx';
@@ -485,7 +484,7 @@ class FichajesDiariosService
     private function getTrabajadoresFiltrados($groupId, string $estado): Collection
     {
         $q = TrabajadorPolifonia::query()
-            ->select(['id','nombre','email','activo'])
+            ->select(['id','nombre','email','activo']) // (si tienes "turno" en este modelo, mejor añadirlo aquí)
             ->orderBy('nombre');
 
         if ($estado === 'activo')   $q->where('activo', 1);
@@ -503,7 +502,6 @@ class FichajesDiariosService
             $q->whereIn('id', $ids);
         }
 
-        // ✅ devolvemos Support\Collection para evitar líos de tipos
         return collect($q->get());
     }
 
@@ -578,18 +576,18 @@ class FichajesDiariosService
 
     private function calcWorkedMinutesWithBreaks(Collection $punches, string $shiftType): int
     {
-        // 1) Construir intervalos trabajados (IN -> OUT)
-        $workedIntervals = $this->buildWorkedIntervals($punches); // [[start, end], ...]
+        // 1) intervalos trabajados (IN -> OUT)
+        $workedIntervals = $this->buildWorkedIntervals($punches);
         if (empty($workedIntervals)) return 0;
 
-        // 2) Minutos trabajados brutos
+        // 2) bruto
         $gross = 0;
         foreach ($workedIntervals as [$s, $e]) {
             $diff = $s->diffInMinutes($e, false);
             if ($diff > 0) $gross += $diff;
         }
 
-        // 3) Restar descansos SOLO si hay solape con intervalos trabajados
+        // 3) descansos (incluye regla campaign sin comida si acaban <= 16:00)
         $breaks = $this->getBreakWindowsForShift($shiftType, $workedIntervals);
 
         $deduct = 0;
@@ -642,7 +640,6 @@ class FichajesDiariosService
      */
     private function getBreakWindowsForShift(string $shiftType, array $workedIntervals): array
     {
-        // Para construir ventanas por día, usamos la fecha del primer intervalo
         $day = $workedIntervals[0][0]->copy()->startOfDay();
 
         $make = function(string $hhmmA, string $hhmmB) use ($day) {
@@ -655,18 +652,35 @@ class FichajesDiariosService
 
         $shiftType = strtolower(trim($shiftType));
 
+        // ✅ último OUT del día (para decidir si descuentas comida)
+        $lastOut = null;
+        foreach (array_reverse($workedIntervals) as [$s,$e]) { $lastOut = $e; break; }
+        $lastOutHm = $lastOut ? $lastOut->format('H:i') : null;
+
         if ($shiftType === 'campaign') {
-            return [
+            $out = [
                 $make('10:00','10:30'), // almuerzo
-                $make('14:00','15:00'), // comida
             ];
+
+            // ✅ comida 14-15 SOLO si terminan después de 16:00
+            if ($lastOutHm && $lastOutHm > '16:00') {
+                $out[] = $make('14:00','15:00');
+            }
+
+            return $out;
         }
 
         if ($shiftType === 'office') {
-            return [
-                $make('10:00','10:30'), // almuerzo (asumo misma ventana; si cambia, dime)
-                $make('14:00','16:00'), // comida office
+            $out = [
+                $make('10:00','10:30'),
             ];
+
+            // si terminan pronto, no quites la comida
+            if ($lastOutHm && $lastOutHm > '16:00') {
+                $out[] = $make('14:00','16:00');
+            }
+
+            return $out;
         }
 
         if ($shiftType === 'intensive') {
@@ -676,12 +690,11 @@ class FichajesDiariosService
             $morningOverlap = $this->overlapMinutesWithIntervals($workedIntervals, $morning[0], $morning[1]);
             $eveningOverlap = $this->overlapMinutesWithIntervals($workedIntervals, $evening[0], $evening[1]);
 
-            // Si solapa con ambos (raro), restamos una sola vez 30min (elige el que más solape)
             if ($morningOverlap > 0 || $eveningOverlap > 0) {
                 return ($eveningOverlap > $morningOverlap) ? [$evening] : [$morning];
             }
 
-            return []; // no solapa con ninguno -> no restar
+            return [];
         }
 
         return [];
