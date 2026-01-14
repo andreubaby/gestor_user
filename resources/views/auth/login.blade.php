@@ -55,7 +55,6 @@
                 <p class="mt-6 text-slate-700 leading-relaxed">
                     Accede al panel de administración de usuarios.
                 </p>
-
             </div>
         </section>
 
@@ -80,7 +79,8 @@
                 </div>
             @endif
 
-            <form method="POST"
+            <form id="loginForm"
+                  method="POST"
                   action="{{ route('login') }}"
                   class="space-y-5"
                   autocomplete="on"
@@ -130,16 +130,23 @@
                     </div>
                 </div>
 
-                {{-- Remember + links --}}
+                {{-- Remember --}}
                 <div class="flex items-center justify-between">
                     <label class="flex items-center gap-2">
-                        <input id="remember" type="checkbox" name="remember"
-                               class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200">
+                        {{-- ✅ Siempre manda remember: 0 o 1 --}}
+                        <input type="hidden" name="remember" value="0">
+
+                        <input
+                            id="remember"
+                            type="checkbox"
+                            name="remember"
+                            value="1"
+                            class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
+                            {{-- ✅ Persistencia en validaciones fallidas (POST) --}}
+                            {{ old('remember') ? 'checked' : '' }}
+                        >
                         <span class="text-sm text-slate-700">Recuérdame</span>
                     </label>
-
-                    {{-- Si activas reset, descomenta --}}
-                    {{-- <a href="{{ route('password.request') }}" class="text-sm font-semibold text-emerald-700 hover:text-emerald-800 underline underline-offset-4">¿Olvidaste tu contraseña?</a> --}}
                 </div>
 
                 {{-- Botón --}}
@@ -166,22 +173,44 @@
 </main>
 
 <script>
-    // Mostrar/ocultar password
-    const btn = document.getElementById('togglePassword');
-    const pwd = document.getElementById('password');
-    btn?.addEventListener('click', () => {
-        const isPwd = pwd.type === 'password';
-        pwd.type = isPwd ? 'text' : 'password';
-        btn.setAttribute('aria-label', isPwd ? 'Ocultar contraseña' : 'Mostrar contraseña');
-        btn.querySelector('span').textContent = isPwd ? '🙈' : '👁️';
-    });
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1) Mostrar/ocultar password
+        const btn = document.getElementById('togglePassword');
+        const pwd = document.getElementById('password');
 
-    // Evita doble submit accidental
-    const form = document.querySelector('form');
-    const submitBtn = document.getElementById('submitBtn');
-    form?.addEventListener('submit', () => {
-        submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-60','cursor-not-allowed');
+        btn?.addEventListener('click', () => {
+            const isPwd = pwd.type === 'password';
+            pwd.type = isPwd ? 'text' : 'password';
+            btn.setAttribute('aria-label', isPwd ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            const icon = btn.querySelector('span');
+            if (icon) icon.textContent = isPwd ? '🙈' : '👁️';
+        });
+
+        // 2) Evita doble submit accidental
+        const form = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        form?.addEventListener('submit', () => {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-60','cursor-not-allowed');
+        });
+
+        // 3) Persistencia del checkbox "remember" (localStorage)
+        const KEY = 'bp_remember';
+        const remember = document.getElementById('remember');
+        if (!remember) return;
+
+        // Si el backend ya marcó old('remember'), lo respetamos.
+        const hasOldRememberChecked = remember.checked;
+
+        if (!hasOldRememberChecked) {
+            const saved = localStorage.getItem(KEY);
+            if (saved === '1') remember.checked = true;
+            if (saved === '0') remember.checked = false;
+        }
+
+        remember.addEventListener('change', () => {
+            localStorage.setItem(KEY, remember.checked ? '1' : '0');
+        });
     });
 </script>
 
