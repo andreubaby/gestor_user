@@ -252,10 +252,22 @@ function switchAusTab(tab){
     AUS.rangeStart = null;
     AUS.rangeEnd = null;
 
+    // ✅ Evita bugs de año: bucketYear SOLO aplica a vacaciones
+    // En permisos/bajas, forzamos bucketYear = CAL.year para que no “arrastre” otro año.
+    if (tab !== 'vacaciones') {
+        AUS.bucketYear = CAL.year;
+    } else {
+        // si entras en vacaciones y no está definido, usa el año visible
+        AUS.bucketYear = AUS.bucketYear ?? CAL.year;
+    }
+
     applyTabStyles();
-    updateTabBadges?.(); // si lo tienes
+    updateTabBadges?.();
+    syncYearLabels?.();      // si existe tu label de año bucket/calendario
+    initBucketYearControl?.(); // si usas el selector de bucketYear en vacaciones
     renderAusencias();
 }
+
 
 // ---------------- CALENDARIO ANUAL ----------------
 
@@ -356,21 +368,25 @@ function tabToTipo(tab){
     return 'B';
 }
 
-async function saveRangeToServer({workerId, year, tab, from, to, mode}) {
+async function saveRangeToServer({ workerId, calendarYear, bucketYear, tab, from, to, mode }) {
     const url = window.APP.routes.storeDays.replace('__ID__', workerId);
 
+    // ✅ permisos/bajas NO tienen bucketYear distinto
+    const effectiveBucketYear = (tab === 'vacaciones')
+        ? (bucketYear ?? calendarYear)
+        : calendarYear;
+
     const payload = {
-        calendar_year: year,        // año que estás viendo (CAL.year)
+        calendar_year: calendarYear,        // ✅ SIEMPRE el año visible
         tipo: tabToTipo(tab),
         from,
         to,
         mode,
+        // ✅ SIEMPRE manda vacation_year real que quieres guardar
+        bucket_year: effectiveBucketYear,
     };
 
-    // ✅ Solo en vacaciones permitimos imputar a otro año
-    if (tab === 'vacaciones') {
-        payload.bucket_year = AUS.bucketYear ?? year; // 2025 o 2026 (lo que elijas)
-    }
+    console.log('[AUS SAVE] payload =>', payload);
 
     const res = await fetch(url, {
         method: 'POST',
@@ -383,16 +399,21 @@ async function saveRangeToServer({workerId, year, tab, from, to, mode}) {
         body: JSON.stringify(payload),
     });
 
-    const json = await res.json();
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch(e){
+        console.error('[AUS SAVE] NOT JSON', { status: res.status, head: text.slice(0,200) });
+        toastMsg('⚠️ Respuesta inválida del servidor');
+        return false;
+    }
+
     if (!json.ok) {
+        console.error('[AUS SAVE] backend ok=false', json);
         toastMsg('⚠️ Error guardando el rango');
         return false;
     }
 
     AUS.data = json.data;
-    if (AUS.bucketYear !== CAL.year) {
-        // opcional: aquí podrías guardar en un cache por año si luego lo implementas
-    }
     updateRowCounts(workerId, json.data);
     return true;
 }
@@ -569,14 +590,19 @@ function openPdfDebug(url) {
     window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function effectiveVacationYearForPdf(tab){
+    if (tab === 'vacaciones') return safeYear(AUS.bucketYear);
+    return safeYear(CAL.year);
+}
+
 function renderVacPdfButtons() {
     const wrap = document.getElementById("vacPdfWrap");
-    const box = document.getElementById("vacPdfButtons");
+    const box  = document.getElementById("vacPdfButtons");
     if (!wrap || !box) return;
 
     if (AUS.tab !== "vacaciones") {
         wrap.classList.add("hidden");
-        box.replaceChildren(); // evita innerHTML
+        box.replaceChildren();
         return;
     }
 
@@ -591,7 +617,7 @@ function renderVacPdfButtons() {
     const days = new Set();
     items.forEach((it) => {
         const from0 = it.from ?? it.fecha;
-        const to0 = it.to ?? it.fecha;
+        const to0   = it.to   ?? it.fecha;
         if (!from0) return;
 
         const s = parseISO(from0);
@@ -613,7 +639,7 @@ function renderVacPdfButtons() {
     }
 
     const from = sorted[0];
-    const to = sorted[sorted.length - 1];
+    const to   = sorted[sorted.length - 1];
 
     wrap.classList.remove("hidden");
     box.replaceChildren();
@@ -627,12 +653,10 @@ function renderVacPdfButtons() {
     btn.onclick = (ev) => {
         ev.stopPropagation();
 
-        const wid = safeWorkerId(AUS.workerId);
-        const year = safeYear(AUS.bucketYear);
-        if (!wid || !year) return; // o muestra un toast/error
+        const wid  = safeWorkerId(AUS.workerId);
+        const year = effectiveVacationYearForPdf('vacaciones'); // ✅ AUS.bucketYear
+        if (!wid || !year) return;
 
-        // 1) NO confíes en que routes.pdfVac sea seguro
-        // 2) Reemplaza id ya validado
         const rawBase = String(window.APP?.routes?.pdfVac ?? "");
         const urlBase = rawBase.replace("__ID__", wid);
 
@@ -642,46 +666,12 @@ function renderVacPdfButtons() {
         });
 
         if (!finalUrl) return;
-        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=V`;
-        openPdfDebug(finalUrl);
-        // Usar noopener/noreferrer para evitar tabnabbing
-        window.open(finalUrl, "_blank", "noopener,noreferrer");
+
+        console.log('[PDF CLICK]', { tab: AUS.tab, CAL_year: CAL.year, bucketYear: AUS.bucketYear, finalUrl });
+        openPdfDebug(finalUrl); // ✅ ya abre
     };
 
     box.appendChild(btn);
-}
-
-function safeWorkerId(id) {
-    const s = String(id ?? "");
-    // Ajusta a tu formato real (num, uuid, etc.)
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(s)) return null;
-    return s;
-}
-
-function safeYear(y) {
-    const n = Number(y);
-    if (!Number.isInteger(n)) return null;
-    if (n < 2000 || n > 2100) return null;
-    return n;
-}
-
-function buildSafeAppUrl(pathOrUrl, params = {}) {
-    const u = new URL(pathOrUrl, window.location.origin);
-
-    // Bloquea redirects fuera de tu dominio
-    if (u.origin !== window.location.origin) return null;
-
-    // (Opcional recomendable) limita rutas permitidas
-    // Ajusta esto al path real del endpoint de pdf permisos
-    // Ej: const allowedPrefixes = ["/ausencias/pdf/"];
-    const allowedPrefixes = ["/"];
-    if (!allowedPrefixes.some(p => u.pathname.startsWith(p))) return null;
-
-    for (const [k, v] of Object.entries(params)) {
-        if (v !== null && v !== undefined) u.searchParams.set(k, String(v));
-    }
-
-    return u.toString();
 }
 
 function renderPerPdfButtons() {
@@ -689,10 +679,9 @@ function renderPerPdfButtons() {
     const box  = document.getElementById("perPdfButtons");
     if (!wrap || !box) return;
 
-    // Solo visible en tab permisos
     if (AUS.tab !== "permiso") {
         wrap.classList.add("hidden");
-        box.replaceChildren(); // evita innerHTML
+        box.replaceChildren();
         return;
     }
 
@@ -743,8 +732,8 @@ function renderPerPdfButtons() {
     btn.onclick = (ev) => {
         ev.stopPropagation();
 
-        const wid = safeWorkerId(AUS.workerId);
-        const year = safeYear(CAL.year);
+        const wid  = safeWorkerId(AUS.workerId);
+        const year = effectiveVacationYearForPdf('permiso'); // ✅ CAL.year
         if (!wid || !year) return;
 
         const rawBase = String(window.APP?.routes?.pdfPer ?? "");
@@ -756,81 +745,124 @@ function renderPerPdfButtons() {
         });
 
         if (!finalUrl) return;
-        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=P`;
-        openPdfDebug(finalUrl);
-        window.open(finalUrl, "_blank", "noopener,noreferrer");
+
+        console.log('[PDF CLICK]', { tab: AUS.tab, CAL_year: CAL.year, bucketYear: AUS.bucketYear, finalUrl });
+        openPdfDebug(finalUrl); // ✅ ya abre
     };
 
     box.appendChild(btn);
 }
 
-function renderBajPdfButtons(){
-    const wrap = document.getElementById('bajPdfWrap');
-    const box  = document.getElementById('bajPdfButtons');
+function renderBajPdfButtons() {
+    const wrap = document.getElementById("bajPdfWrap");
+    const box  = document.getElementById("bajPdfButtons");
     if (!wrap || !box) return;
 
-    // Solo visible en tab bajas
-    if (AUS.tab !== 'baja'){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (AUS.tab !== "baja") {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     const items = AUS.data?.baja?.items || [];
-    if (!items.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!items.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     // calcula primer y último día real de bajas
     const days = new Set();
     items.forEach(it => {
-        const from = it.from ?? it.fecha;
-        const to   = it.to   ?? it.fecha;
-        if (!from) return;
+        const from0 = it.from ?? it.fecha;
+        const to0   = it.to   ?? it.fecha;
+        if (!from0) return;
 
-        const s = parseISO(from);
-        const e = parseISO(to || from);
+        const s = parseISO(from0);
+        const e = parseISO(to0 || from0);
         if (!s || !e) return;
 
         const cur = new Date(s.getTime());
-        while (cur <= e){
-            days.add(formatDate(cur.getFullYear(), cur.getMonth()+1, cur.getDate()));
+        while (cur <= e) {
+            days.add(formatDate(cur.getFullYear(), cur.getMonth() + 1, cur.getDate()));
             cur.setDate(cur.getDate() + 1);
         }
     });
 
     const sorted = Array.from(days).sort();
-    if (!sorted.length){
-        wrap.classList.add('hidden');
-        box.innerHTML = '';
+    if (!sorted.length) {
+        wrap.classList.add("hidden");
+        box.replaceChildren();
         return;
     }
 
     const from = sorted[0];
     const to   = sorted[sorted.length - 1];
 
-    wrap.classList.remove('hidden');
-    box.innerHTML = '';
+    wrap.classList.remove("hidden");
+    box.replaceChildren();
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = "px-3 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className =
+        "px-3 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition";
     btn.textContent = `📄 PDF (todas) (${fmtDM(from)}–${fmtDM(to)})`;
 
     btn.onclick = (ev) => {
         ev.stopPropagation();
 
-        const urlBase = window.APP.routes.pdfBaj.replace('__ID__', AUS.workerId);
+        const wid  = safeWorkerId(AUS.workerId);
+        const year = effectiveVacationYearForPdf('baja'); // ✅ CAL.year
+        if (!wid || !year) return;
 
-        // backend coge TODOS los rangos del año
-        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=B`;
-        openPdfDebug(url);
-        window.open(url, '_blank', 'noopener');
+        const rawBase = String(window.APP?.routes?.pdfBaj ?? "");
+        const urlBase = rawBase.replace("__ID__", wid);
+
+        const finalUrl = buildSafeAppUrl(urlBase, {
+            vacation_year: year,
+            tipo: "B",
+        });
+
+        if (!finalUrl) return;
+
+        console.log('[PDF CLICK]', { tab: AUS.tab, CAL_year: CAL.year, bucketYear: AUS.bucketYear, finalUrl });
+        openPdfDebug(finalUrl); // ✅ ya abre
     };
 
     box.appendChild(btn);
+}
+
+function safeWorkerId(id) {
+    const s = String(id ?? "");
+    // Ajusta a tu formato real (num, uuid, etc.)
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(s)) return null;
+    return s;
+}
+
+function safeYear(y) {
+    const n = Number(y);
+    if (!Number.isInteger(n)) return null;
+    if (n < 2000 || n > 2100) return null;
+    return n;
+}
+
+function buildSafeAppUrl(pathOrUrl, params = {}) {
+    const u = new URL(pathOrUrl, window.location.origin);
+
+    // Bloquea redirects fuera de tu dominio
+    if (u.origin !== window.location.origin) return null;
+
+    // (Opcional recomendable) limita rutas permitidas
+    // Ajusta esto al path real del endpoint de pdf permisos
+    // Ej: const allowedPrefixes = ["/ausencias/pdf/"];
+    const allowedPrefixes = ["/"];
+    if (!allowedPrefixes.some(p => u.pathname.startsWith(p))) return null;
+
+    for (const [k, v] of Object.entries(params)) {
+        if (v !== null && v !== undefined) u.searchParams.set(k, String(v));
+    }
+
+    return u.toString();
 }
 
 function computeFromToFromItems(items){
@@ -1478,7 +1510,8 @@ async function handleDayClick(dateStr){
     try {
         const ok = await saveRangeToServer({
             workerId: AUS.workerId,
-            year: AUS.bucketYear,
+            calendarYear: CAL.year,           // ✅ año que ves
+            bucketYear: AUS.bucketYear ?? CAL.year, // ✅ año de imputación
             tab,
             from,
             to,

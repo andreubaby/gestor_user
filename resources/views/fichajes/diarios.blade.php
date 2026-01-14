@@ -96,7 +96,6 @@
                               focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
             </div>
 
-            {{-- ✅ NUEVO: Mes para export mensual (YYYY-MM) --}}
             <div class="md:col-span-3">
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Mes (Excel)</label>
                 <input type="month" name="month" value="{{ request('month') ?? now()->format('Y-m') }}"
@@ -123,7 +122,7 @@
                 <select name="estado"
                         onchange="this.form.submit()"
                         class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
-                 focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
+                               focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
                     <option value="" {{ request('estado') === null || request('estado') === '' ? 'selected' : '' }}>Todos</option>
                     <option value="activo" {{ request('estado') === 'activo' ? 'selected' : '' }}>Activos</option>
                     <option value="inactivo" {{ request('estado') === 'inactivo' ? 'selected' : '' }}>Inactivos</option>
@@ -143,12 +142,9 @@
                     Limpiar
                 </a>
 
-                {{-- ✅ NUEVO: Export Excel según filtros (grupo/estado + month) --}}
-                <a
-                    href="{{ route('fichajes.diarios.export', request()->query()) }}"
-                    class="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-semibold
-                           hover:bg-emerald-800 transition focus:outline-none focus:ring-4 focus:ring-emerald-200 shadow"
-                >
+                <a href="{{ route('fichajes.diarios.export', request()->query()) }}"
+                   class="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-semibold
+                          hover:bg-emerald-800 transition focus:outline-none focus:ring-4 focus:ring-emerald-200 shadow">
                     ⬇️ Excel (según filtros)
                 </a>
 
@@ -159,8 +155,8 @@
         </form>
     </section>
 
-    {{-- Stats (simple) --}}
-    <section class="grid grid-cols-2 md:grid-cols-3 gap-3">
+    {{-- Stats --}}
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div class="bg-white rounded-2xl ring-1 ring-emerald-100 p-4 shadow-sm">
             <div class="text-xs text-slate-500">Total</div>
             <div class="text-2xl font-semibold text-slate-900">{{ $stats['total'] ?? 0 }}</div>
@@ -174,6 +170,14 @@
         <div class="bg-white rounded-2xl ring-1 ring-emerald-100 p-4 shadow-sm">
             <div class="text-xs text-slate-500">No ficharon</div>
             <div class="text-2xl font-semibold text-red-700">{{ $stats['sin_fichaje'] ?? 0 }}</div>
+            <div class="mt-1 text-[11px] text-slate-500">Sin fichaje y sin ausencia</div>
+        </div>
+
+        {{-- ✅ NUEVO: en ausencia --}}
+        <div class="bg-white rounded-2xl ring-1 ring-emerald-100 p-4 shadow-sm">
+            <div class="text-xs text-slate-500">En ausencia</div>
+            <div class="text-2xl font-semibold text-amber-700">{{ $stats['en_ausencia'] ?? 0 }}</div>
+            <div class="mt-1 text-[11px] text-slate-500">Vacaciones / Permiso / Baja</div>
         </div>
     </section>
 
@@ -189,7 +193,7 @@
         </span>
     </section>
 
-    {{-- Tabla (simple + horas) --}}
+    {{-- Tabla --}}
     <section class="overflow-x-auto bg-white shadow-md rounded-2xl ring-1 ring-emerald-100">
         <table class="min-w-full divide-y divide-emerald-100 text-sm table-auto">
             <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white uppercase tracking-wider text-xs sticky top-0 z-10">
@@ -205,10 +209,16 @@
             @forelse($rows as $r)
                 @php
                     $ha = (($r->count ?? 0) > 0);
-
-                    // esperamos que el backend entregue: first_in, last_out (HH:MM o null)
                     $entrada = $r->first_in ?? null;
                     $salida  = $r->last_out ?? null;
+
+                    $absence = $r->absence_tipo ?? null; // 'V'|'P'|'B'|null
+                    $absenceLabel = match($absence) {
+                        'V' => '🏖 Vacaciones',
+                        'P' => '📝 Permiso',
+                        'B' => '🏥 Baja',
+                        default => null,
+                    };
 
                     // badges (estado)
                     $estadoBadge = 'bg-slate-100 text-slate-600';
@@ -221,9 +231,16 @@
                             $estadoText  = '✅ Fichó';
                             $rowTone     = 'bg-emerald-50/60';
                         } else {
-                            $estadoBadge = 'bg-red-100 text-red-700';
-                            $estadoText  = '❌ No fichó';
-                            $rowTone     = 'bg-red-50/50';
+                            // ✅ si no fichó pero está en ausencia -> mostrar causa
+                            if ($absenceLabel) {
+                                $estadoBadge = 'bg-amber-100 text-amber-800';
+                                $estadoText  = $absenceLabel;
+                                $rowTone     = 'bg-amber-50/60';
+                            } else {
+                                $estadoBadge = 'bg-red-100 text-red-700';
+                                $estadoText  = '❌ No fichó';
+                                $rowTone     = 'bg-red-50/50';
+                            }
                         }
                     } else {
                         $estadoBadge = 'bg-slate-100 text-slate-600';
@@ -235,27 +252,27 @@
                     $chipInClass  = $entrada ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
                     $chipOutClass = $salida  ? 'bg-red-100 text-red-700 ring-1 ring-red-200'           : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
 
-                    // ✅ params para export individual manteniendo filtros actuales
                     $exportParams = array_merge(request()->query(), [
                         'trabajador_id' => $r->trabajador_id ?? $r->id ?? null,
                     ]);
+
+                    // ✅ para el toggle: "no fichó real" = vinculado + !ha + !absence
+                    $isNoReal = ($r->vinculado_fichajes && !$ha && !$absenceLabel);
                 @endphp
 
                 <tr class="transition hover:bg-emerald-50/40 {{ $rowTone }}"
                     data-has="{{ $ha ? 1 : 0 }}"
-                    data-vinc="{{ $r->vinculado_fichajes ? 1 : 0 }}">
+                    data-vinc="{{ $r->vinculado_fichajes ? 1 : 0 }}"
+                    data-noreal="{{ $isNoReal ? 1 : 0 }}">
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-semibold text-slate-900">{{ $r->nombre }}</span>
 
-                            {{-- ✅ NUEVO: Excel individual (una hoja, ese trabajador, el mes elegido) --}}
                             @if(!empty($exportParams['trabajador_id']))
-                                <a
-                                    href="{{ route('fichajes.diarios.export', $exportParams) }}"
-                                    class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold
-                                           bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
-                                    title="Excel mensual de este trabajador"
-                                >
+                                <a href="{{ route('fichajes.diarios.export', $exportParams) }}"
+                                   class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold
+                                          bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+                                   title="Excel mensual de este trabajador">
                                     📄 Excel
                                 </a>
                             @endif
@@ -282,18 +299,15 @@
 
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold {{ $chipInClass }}"
-                                  title="Entrada">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold {{ $chipInClass }}" title="Entrada">
                                 ⏱ <span>In</span> <span class="tabular-nums">{{ $entrada ?? '—' }}</span>
                             </span>
 
-                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold {{ $chipOutClass }}"
-                                  title="Salida">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold {{ $chipOutClass }}" title="Salida">
                                 ⏱ <span>Out</span> <span class="tabular-nums">{{ $salida ?? '—' }}</span>
                             </span>
                         </div>
 
-                        {{-- Si quieres mostrar el último fichaje genérico cuando no hay out/in --}}
                         @if(!$entrada && !$salida && ($r->last_any ?? null))
                             <div class="mt-1 text-[11px] text-slate-500">
                                 Último: <span class="font-semibold tabular-nums">{{ $r->last_any }}</span>
@@ -316,6 +330,7 @@
 
 <script>
     // Mostrar solo NO ficharon (pero dejando "no vinculado" visible también)
+    // ✅ Ahora "NO ficharon" = vinculado + sin fichaje + sin ausencia (no cuenta vacaciones/permiso/baja)
     document.addEventListener('DOMContentLoaded', () => {
         const cb = document.getElementById('onlyNo');
         const tbody = document.getElementById('tbodyFichajes');
@@ -325,13 +340,22 @@
             const onlyNo = cb.checked;
 
             [...tbody.querySelectorAll('tr')].forEach(tr => {
-                const has = tr.dataset.has === '1';
                 const vinc = tr.dataset.vinc === '1';
+                const noReal = tr.dataset.noreal === '1';
 
-                // Si onlyNo: ocultar los que ficharon (vinculados + con fichaje)
-                // Mantener: no fichó y no vinculado
-                if (onlyNo && vinc && has) tr.classList.add('hidden');
-                else tr.classList.remove('hidden');
+                // onlyNo: mostrar "no real" y "no vinculado"
+                // ocultar: ficharon y ausencias
+                if (onlyNo) {
+                    if (!vinc) {
+                        tr.classList.remove('hidden'); // no vinculado siempre visible
+                        return;
+                    }
+                    if (noReal) tr.classList.remove('hidden');
+                    else tr.classList.add('hidden');
+                    return;
+                }
+
+                tr.classList.remove('hidden');
             });
         };
 

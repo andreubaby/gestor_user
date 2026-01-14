@@ -56,11 +56,12 @@ class FichajesDiariosService
                     'estado'  => $estado,
                     'rows'    => collect(),
                     'stats'   => [
-                        'total' => 0,
-                        'con_fichaje' => 0,
-                        'sin_fichaje' => 0,
+                        'total'        => 0,
+                        'con_fichaje'  => 0,
+                        'sin_fichaje'  => 0,
+                        'en_ausencia'  => 0,
                         'solo_entrada' => 0,
-                        'solo_salida' => 0
+                        'solo_salida'  => 0,
                     ],
                 ];
             }
@@ -69,6 +70,50 @@ class FichajesDiariosService
         }
 
         $trabajadores = $trabajadoresQuery->get();
+
+        /**
+         * =========================
+         * 1.5) AUSENCIAS DEL DÍA (V/P/B) por trabajador
+         * =========================
+         * ✅ Se calcula por FECHA (no por vacation_year) => evita bugs de años cruzados.
+         * Prioridad si hubiera más de una: B > P > V
+         */
+        $trabajadorIds = $trabajadores->pluck('id')->map(fn ($v) => (int)$v)->values();
+
+        $absenceMap = collect(); // trabajador_id => 'V'|'P'|'B'
+        if ($trabajadorIds->isNotEmpty()) {
+            $absRaw = DB::connection('mysql_polifonia') // ⚠️ cambia a tu conexión real si no es mysql
+            ->table('trabajadores_dias')    // ⚠️ cambia si la tabla se llama distinto
+            ->select(['trabajador_id', 'tipo'])
+                ->whereIn('trabajador_id', $trabajadorIds->all())
+                ->whereDate('fecha', $date)
+                ->get();
+
+            $prio = fn (string $tipo) => match (strtoupper($tipo)) {
+                'B' => 3,
+                'P' => 2,
+                'V' => 1,
+                default => 0,
+            };
+
+            $absenceMap = collect($absRaw)
+                ->groupBy(fn ($r) => (int)$r->trabajador_id)
+                ->map(function ($items) use ($prio) {
+                    $best = null;
+                    $bestPrio = 0;
+
+                    foreach ($items as $it) {
+                        $t = strtoupper((string)($it->tipo ?? ''));
+                        $p = $prio($t);
+                        if ($p > $bestPrio) {
+                            $bestPrio = $p;
+                            $best = $t;
+                        }
+                    }
+
+                    return $best; // 'B'|'P'|'V'|null
+                });
+        }
 
         /**
          * =========================
@@ -147,13 +192,6 @@ class FichajesDiariosService
          * =========================
          * B) FICHAJES ANTIGUOS (BD trabajadores / mysql_polifonia)
          * =========================
-         *
-         * Ajusta si tu tabla no se llama "fichar" o si los campos difieren.
-         * Esperado:
-         * - user_id (== trabajador_id)
-         * - tipo: I/F (Entrada/Salida)
-         * - fecha_hora (datetime)
-         * - bienestar (opcional)
          */
         $fichajesTrabajadores = DB::connection('mysql_trabajadores')
             ->table('fichar') // ⚠️ ajusta si el nombre real difiere
@@ -204,7 +242,7 @@ class FichajesDiariosService
          * 4) CONSTRUIR FILAS (por trabajador)
          * =========================
          */
-        $rows = $trabajadores->map(function ($t) use ($mapTrabajadorToFichajes, $punchesByTrabajador, $date) {
+        $rows = $trabajadores->map(function ($t) use ($mapTrabajadorToFichajes, $punchesByTrabajador, $date, $absenceMap) {
             $trabajadorId = (int)$t->id;
             $fu = $mapTrabajadorToFichajes->get($trabajadorId); // user_id en fichajes (puede ser null)
 
@@ -216,12 +254,17 @@ class FichajesDiariosService
             $firstIn = $entradas->first()['hora'] ?? null;
             $lastOut = $salidas->last()['hora'] ?? null;
 
+            $absenceTipo = $absenceMap->get($trabajadorId); // 'V'|'P'|'B'|null
+
             return (object)[
                 'date'          => $date,
                 'trabajador_id' => $trabajadorId,
                 'nombre'        => $t->nombre,
                 'email'         => $t->email,
                 'activo'        => (int)($t->activo ?? 0),
+
+                // ✅ NUEVO: causa de no fichar (si aplica)
+                'absence_tipo'  => $absenceTipo,
 
                 // aunque no esté vinculado en "fichajes", puede fichar en la BD vieja
                 'vinculado_fichajes' => (bool)$fu,
@@ -250,17 +293,21 @@ class FichajesDiariosService
 
         /**
          * =========================
-         * 5) STATS
+         * 5) STATS (sin fichaje real vs en ausencia)
          * =========================
          */
-        $conFichaje  = $rows->filter(fn ($r) => $r->count > 0)->count();
-        $soloEntrada = $rows->filter(fn ($r) => (bool)$r->solo_entrada)->count();
-        $soloSalida  = $rows->filter(fn ($r) => (bool)$r->solo_salida)->count();
+        $conFichaje  = $rows->filter(fn ($r) => ($r->count ?? 0) > 0)->count();
+        $soloEntrada = $rows->filter(fn ($r) => (bool)($r->solo_entrada ?? false))->count();
+        $soloSalida  = $rows->filter(fn ($r) => (bool)($r->solo_salida ?? false))->count();
+
+        $enAusencia = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && !empty($r->absence_tipo))->count();
+        $sinFichajeReal = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && empty($r->absence_tipo))->count();
 
         $stats = [
             'total'        => $rows->count(),
             'con_fichaje'  => $conFichaje,
-            'sin_fichaje'  => $rows->count() - $conFichaje,
+            'sin_fichaje'  => $sinFichajeReal, // ✅ ahora es “no fichó” real
+            'en_ausencia'  => $enAusencia,     // ✅ opcional (para una tarjeta extra)
             'solo_entrada' => $soloEntrada,
             'solo_salida'  => $soloSalida,
         ];
