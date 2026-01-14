@@ -429,4 +429,34 @@ class UsuarioController extends Controller
 
         return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, $tipo);
     }
+    public function permisos(Request $request, $trabajadorId)
+    {
+        $year = (int) $request->query('vacation_year', now()->year);
+
+        Log::info('[PDF PERMISOS] request', [
+            'trabajadorId' => $trabajadorId,
+            'vacation_year' => $year,
+            'tipo_forzado' => 'P',
+            'full_url' => $request->fullUrl(),
+            'query' => $request->query(),
+        ]);
+
+        return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, 'P');
+    }
+
+    public function bajas(Request $request, $trabajadorId)
+    {
+        $year = (int) $request->query('vacation_year', now()->year);
+
+        Log::info('[PDF BAJAS] request', [
+            'trabajadorId' => $trabajadorId,
+            'vacation_year' => $year,
+            'tipo_forzado' => 'B',
+            'full_url' => $request->fullUrl(),
+            'query' => $request->query(),
+        ]);
+
+        return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, 'B');
+    }
+
 }

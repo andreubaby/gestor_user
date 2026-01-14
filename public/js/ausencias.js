@@ -563,6 +563,12 @@ function debugSelection(){
     alert(`Seleccionados ${tab} (${arr.length}):\n` + arr.join('\n'));
 }
 
+function openPdfDebug(url) {
+    console.log("🧾 PDF URL =>", url);
+    toastMsg("PDF URL: " + url);
+    window.open(url, "_blank", "noopener,noreferrer");
+}
+
 function renderVacPdfButtons() {
     const wrap = document.getElementById("vacPdfWrap");
     const box = document.getElementById("vacPdfButtons");
@@ -636,7 +642,8 @@ function renderVacPdfButtons() {
         });
 
         if (!finalUrl) return;
-
+        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=V`;
+        openPdfDebug(finalUrl);
         // Usar noopener/noreferrer para evitar tabnabbing
         window.open(finalUrl, "_blank", "noopener,noreferrer");
     };
@@ -749,7 +756,8 @@ function renderPerPdfButtons() {
         });
 
         if (!finalUrl) return;
-
+        const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=P`;
+        openPdfDebug(finalUrl);
         window.open(finalUrl, "_blank", "noopener,noreferrer");
     };
 
@@ -818,6 +826,7 @@ function renderBajPdfButtons(){
 
         // backend coge TODOS los rangos del año
         const url = `${urlBase}?vacation_year=${encodeURIComponent(CAL.year)}&tipo=B`;
+        openPdfDebug(url);
         window.open(url, '_blank', 'noopener');
     };
 
