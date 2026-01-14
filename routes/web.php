@@ -105,13 +105,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/trabajadores/{trabajador}/dias', [UsuarioController::class, 'getDays'])
         ->name('trabajadores.dias.get');
 
-    Route::get('/trabajadores/{trabajador}/pdf/vacaciones', [UsuarioController::class, 'vacaciones'])
+    Route::get('/trabajadores/{trabajador}/vacaciones/pdf', [UsuarioController::class, 'vacaciones'])
         ->name('trabajadores.vacaciones.pdf');
 
-    Route::get('/trabajadores/{trabajador}/pdf/permisos', [UsuarioController::class, 'vacaciones'])
+    Route::get('/trabajadores/{trabajador}/permisos/pdf', [UsuarioController::class, 'permisos'])
         ->name('trabajadores.permisos.pdf');
 
-    Route::get('/trabajadores/{trabajador}/pdf/bajas', [UsuarioController::class, 'vacaciones'])
+    Route::get('/trabajadores/{trabajador}/bajas/pdf', [UsuarioController::class, 'bajas'])
         ->name('trabajadores.bajas.pdf');
 
     Route::get('/groups/asignar', [GroupAssignmentController::class, 'create'])->name('groups.assign.create');
