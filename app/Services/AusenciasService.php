@@ -9,6 +9,8 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
 class AusenciasService
 {
@@ -95,46 +97,150 @@ class AusenciasService
         return $this->buildAusenciasPayloadByCalendarYear($trabajadorId, (int)$data['calendar_year']);
     }
 
-    public function streamPdfVacaciones(int $trabajadorId, int $vacationYear, string $tipo): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function streamPdfVacaciones(int $trabajadorId, int $vacationYear, string $tipo): Response
     {
-        $tipo = strtoupper($tipo); // V|P|B
+        try {
+            $tipoRaw = $tipo;
+            $tipo = strtoupper($tipoRaw); // V|P|B
 
-        $t = TrabajadorPolifonia::query()->findOrFail($trabajadorId);
+            Log::info('[PDF STREAM] ENTER', [
+                'trabajadorId'   => $trabajadorId,
+                'vacationYear'   => $vacationYear,
+                'tipo_raw'       => $tipoRaw,
+                'tipo_norm'      => $tipo,
+                'full_url'       => request()?->fullUrl(),
+                'query'          => request()?->query(),
+                'env'            => app()->environment(),
+                'db_default'     => config('database.default'),
+            ]);
 
-        $diasBase = TrabajadorDia::query()
-            ->where('trabajador_id', $trabajadorId)
-            ->where('vacation_year', $vacationYear)
-            ->where('tipo', $tipo)
-            ->orderBy('fecha')
-            ->pluck('fecha');
+            // ✅ Confirma trabajador
+            $t = TrabajadorPolifonia::query()->findOrFail($trabajadorId);
 
-        if ($diasBase->isEmpty()) {
-            abort(404, 'No hay ausencias registradas');
+            Log::info('[PDF STREAM] trabajador OK', [
+                'trabajadorId' => $t->id,
+                'nombre'       => $t->nombre,
+                'empresa'      => $t->empresa,
+            ]);
+
+            // ✅ Diagnóstico: qué hay en la tabla para ese trabajador (años)
+            $yearsEnTabla = TrabajadorDia::query()
+                ->where('trabajador_id', $trabajadorId)
+                ->selectRaw('vacation_year, count(*) as c')
+                ->groupBy('vacation_year')
+                ->orderBy('vacation_year')
+                ->pluck('c', 'vacation_year')
+                ->toArray();
+
+            Log::info('[PDF STREAM] years in TrabajadorDia', [
+                'trabajadorId' => $trabajadorId,
+                'years'        => $yearsEnTabla,
+            ]);
+
+            // ✅ Diagnóstico: qué tipos hay para ESE AÑO
+            $tiposEnTabla = TrabajadorDia::query()
+                ->where('trabajador_id', $trabajadorId)
+                ->where('vacation_year', $vacationYear)
+                ->selectRaw('tipo, count(*) as c')
+                ->groupBy('tipo')
+                ->pluck('c', 'tipo')
+                ->toArray();
+
+            Log::info('[PDF STREAM] tipos in year', [
+                'trabajadorId' => $trabajadorId,
+                'vacationYear' => $vacationYear,
+                'tipos'        => $tiposEnTabla,
+            ]);
+
+            // ✅ Query real del PDF
+            $diasBase = TrabajadorDia::query()
+                ->where('trabajador_id', $trabajadorId)
+                ->where('vacation_year', $vacationYear)
+                ->where('tipo', $tipo)
+                ->orderBy('fecha')
+                ->pluck('fecha');
+
+            Log::info('[PDF STREAM] diasBase result', [
+                'trabajadorId' => $trabajadorId,
+                'vacationYear' => $vacationYear,
+                'tipo'         => $tipo,
+                'count'        => $diasBase->count(),
+                'sample'       => $diasBase->take(20)->values()->all(),
+            ]);
+
+            if ($diasBase->isEmpty()) {
+                Log::warning('[PDF STREAM] EMPTY => abort 404', [
+                    'trabajadorId' => $trabajadorId,
+                    'vacationYear' => $vacationYear,
+                    'tipo'         => $tipo,
+                    'tiposEnTabla' => $tiposEnTabla,
+                    'yearsEnTabla' => $yearsEnTabla,
+                ]);
+
+                abort(404, 'No hay ausencias registradas');
+            }
+
+            // ✅ Transformaciones
+            $dias = $this->extendConsecutivosPosteriores($trabajadorId, $tipo, $diasBase);
+            $rangos = $this->toRangos($dias);
+
+            Log::info('[PDF STREAM] rangos built', [
+                'trabajadorId' => $trabajadorId,
+                'vacationYear' => $vacationYear,
+                'tipo'         => $tipo,
+                'dias_count'   => is_countable($dias) ? count($dias) : null,
+                'rangos_count' => is_countable($rangos) ? count($rangos) : null,
+                'rangos_head'  => array_slice($rangos ?? [], 0, 5),
+            ]);
+
+            $tipoTexto = match ($tipo) {
+                'V' => 'vacaciones',
+                'P' => 'permisos',
+                'B' => 'bajas',
+                default => 'ausencias',
+            };
+
+            $data = [
+                'empresa'    => $t->empresa,
+                'trabajador' => $t->nombre,
+                'dni'        => $t->nif,
+                'tipo'       => $tipoTexto,
+                'anyo'       => $vacationYear,
+                'rangos'     => $rangos,
+                'fecha'      => now()->format('d/m/Y'),
+            ];
+
+            Log::info('[PDF STREAM] rendering PDF', [
+                'view'        => 'pdfs.pdp_vacaciones',
+                'filename'    => "{$tipoTexto}_{$trabajadorId}_{$vacationYear}.pdf",
+                'tipoTexto'   => $tipoTexto,
+            ]);
+
+            $pdf = Pdf::loadView('pdfs.pdp_vacaciones', $data);
+
+            // ✅ IMPORTANTE: DomPDF stream devuelve Response (Illuminate\Http\Response)
+            $resp = $pdf->stream("{$tipoTexto}_{$trabajadorId}_{$vacationYear}.pdf");
+
+            Log::info('[PDF STREAM] DONE stream()', [
+                'response_class' => is_object($resp) ? get_class($resp) : gettype($resp),
+            ]);
+
+            return $resp;
+
+        } catch (\Throwable $e) {
+            Log::error('[PDF STREAM] EXCEPTION', [
+                'trabajadorId' => $trabajadorId ?? null,
+                'vacationYear' => $vacationYear ?? null,
+                'tipo'         => $tipo ?? null,
+                'class'        => get_class($e),
+                'msg'          => $e->getMessage(),
+                'file'         => $e->getFile(),
+                'line'         => $e->getLine(),
+                'trace_head'   => array_slice($e->getTrace(), 0, 8),
+            ]);
+
+            throw $e;
         }
-
-        $dias = $this->extendConsecutivosPosteriores($trabajadorId, $tipo, $diasBase);
-
-        $rangos = $this->toRangos($dias);
-
-        $tipoTexto = match ($tipo) {
-            'V' => 'vacaciones',
-            'P' => 'permisos',
-            'B' => 'bajas',
-            default => 'ausencias',
-        };
-
-        $data = [
-            'empresa'    => $t->empresa,
-            'trabajador' => $t->nombre,
-            'dni'        => $t->nif,
-            'tipo'       => $tipoTexto,
-            'anyo'       => $vacationYear,
-            'rangos'     => $rangos,
-            'fecha'      => now()->format('d/m/Y'),
-        ];
-
-        $pdf = Pdf::loadView('pdfs.pdp_vacaciones', $data);
-        return $pdf->stream("{$tipoTexto}_{$trabajadorId}_{$vacationYear}.pdf");
     }
 
     private function extendConsecutivosPosteriores(int $trabajadorId, string $tipo, Collection $diasBase): Collection
