@@ -3,6 +3,7 @@
 use App\Http\Controllers\FichajeController;
 use App\Http\Controllers\FichajesDiariosController;
 use App\Http\Controllers\GroupAssignmentController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
 use App\Http\Controllers\UserSemillasController;
@@ -80,6 +81,11 @@ Route::middleware('auth')->group(function () {
     Route::put('/fichajes/{trabajador}', [FichajeController::class, 'update'])->name('fichajes.update');
     Route::get('/usuarios/{trabajador}/fichajes-unificado', [FichajeController::class, 'fichajesUnificado'])
         ->name('usuarios.fichajes.unificado');
+    Route::get('/usuarios/onboarding', [OnboardingController::class, 'onboardingCreate'])
+        ->name('usuarios.onboarding.create');
+
+    Route::post('/usuarios/onboarding/send', [OnboardingController::class, 'onboardingSend'])
+        ->name('usuarios.onboarding.send');
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
 
