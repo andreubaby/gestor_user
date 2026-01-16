@@ -4,6 +4,7 @@ use App\Http\Controllers\FichajeController;
 use App\Http\Controllers\FichajesDiariosController;
 use App\Http\Controllers\GroupAssignmentController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\RrhhDocumentosController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
 use App\Http\Controllers\UserSemillasController;
@@ -123,6 +124,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/groups/asignar', [GroupAssignmentController::class, 'create'])->name('groups.assign.create');
     Route::post('/groups/asignar', [GroupAssignmentController::class, 'store'])->name('groups.assign.store');
     Route::delete('/groups/asignar', [GroupAssignmentController::class, 'detach'])->name('groups.assign.detach');
+
+    //RRHH
+    Route::get('/rrhh/documentos', [RrhhDocumentosController::class, 'index'])
+        ->name('rrhh.documentos.index');
+
+    Route::post('/rrhh/documentos/pdf', [RrhhDocumentosController::class, 'pdf'])
+        ->name('rrhh.documentos.pdf');
+
+    Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
+        ->name('rrhh.documentos.zip');
     // 🚪 Cerrar sesión
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
