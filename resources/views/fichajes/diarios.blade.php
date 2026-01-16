@@ -56,6 +56,11 @@
                 Fichajes diarios
             </a>
 
+            <a href="{{ route('usuarios.onboarding.create') }}"
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                Onboarding
+            </a>
+
             <a href="{{ route('groups.assign.create') }}"
                class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
                       focus:outline-none focus:ring-4 focus:ring-emerald-200">
