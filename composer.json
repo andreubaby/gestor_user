@@ -12,7 +12,8 @@
         "laravel/tinker": "^2.10.1",
         "league/commonmark": "2.7",
         "maatwebsite/excel": "^3.1",
-        "symfony/http-foundation": "7.3.7"
+        "symfony/http-foundation": "7.3.7",
+        "ext-zip": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
