@@ -91,8 +91,8 @@
             </a>
 
             <a href="{{ route('usuarios.vincular') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200
-                      hover:bg-emerald-100 transition focus:outline-none focus:ring-4 focus:ring-emerald-200">
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
+                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
                 Vincular
             </a>
 
@@ -104,6 +104,11 @@
             <a href="{{ route('usuarios.onboarding.create') }}"
                class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
                 Onboarding
+            </a>
+
+            <a href="{{ route('rrhh.documentos.index') }}"
+               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
+                RRHH
             </a>
 
             <a href="{{ route('groups.assign.create') }}"
