@@ -107,8 +107,8 @@ return [
 
         // ========== VEHÍCULO ==========
         'vehiculo_uso_conservacion_aut' => [
-            'label'    => 'Autorización de uso de vehículo y conservación',
-            'template' => 'rrhh_templates/AUTORIZACIÓN DE USO DE VEHÍCULO Y CONSERVACION.pdf',
+            'label'    => 'Autorizacion de uso de vehiculo y conservacion',
+            'template' => 'rrhh_templates/Autorizacion de uso de vehiculo y conservacion en estado optimo.pdf',
             'filename' => 'Autorizacion_UsoVehiculo_Conservacion_{nombre}_{dni}_{fecha}.pdf',
             'category' => 'Vehículo',
         ],
