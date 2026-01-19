@@ -128,14 +128,6 @@ return [
             'category' => 'IT',
         ],
 
-        // ========== PLANTILLA (BASE) ==========
-        'plantilla_aut_maquinaria' => [
-            'label'    => 'Plantilla · Autorización Utilización Maquinaria (base)',
-            'template' => 'rrhh_templates/Plantilla AUTORIZACION UTILIZACION MAQUINARIA _.pdf',
-            'filename' => 'Plantilla_Autorizacion_Maquinaria_{nombre}_{dni}_{fecha}.pdf',
-            'category' => 'Plantillas',
-        ],
-
         'entrega_info' => [
             'label'    => 'Entrega de informacion Firma',
             'template' => 'rrhh_templates/Entrega de informacion Firma.pdf',
