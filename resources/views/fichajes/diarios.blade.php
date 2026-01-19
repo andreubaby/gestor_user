@@ -268,6 +268,18 @@
 
                     // ✅ para el toggle: "no fichó real" = vinculado + !ha + !absence
                     $isNoReal = ($r->vinculado_fichajes && !$ha && !$absenceLabel);
+
+                   // ✅ Override para INACTIVOS: mostrar "--" en gris en vez de "No fichó"
+                    if (isset($r->activo) && (int)$r->activo === 0) {
+                        // Si quieres que SIEMPRE ponga "--" aunque tuviera otros estados:
+                        $estadoBadge = 'bg-slate-100 text-slate-400';
+                        $estadoText  = '--';
+                        $rowTone     = 'bg-slate-50';
+
+                        // (Opcional) también poner chips en gris si quieres:
+                        // $chipInClass  = 'bg-slate-100 text-slate-400 ring-1 ring-slate-200';
+                        // $chipOutClass = 'bg-slate-100 text-slate-400 ring-1 ring-slate-200';
+                    }
                 @endphp
 
                 <tr class="transition hover:bg-emerald-50/40 {{ $rowTone }}"
