@@ -361,6 +361,67 @@
         puestoEl.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
+    // ✅ Presets: puesto -> tipos[] que se auto-marcan en el ZIP
+    const presetsPorPuesto = {
+        "Siembras": [
+            "epis_general_entrega",
+            "maq_siembra_aut",
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+        "Oficina": [
+            "epis_general_entrega",
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+        "Bandejero": [
+            "epis_bandejero_entrega",
+            "maq_bandejero_aut",
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+
+        "Injertos": [
+            "epis_general_entrega",
+            "maq_empaquetadora_injertadora_aut",
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+
+        "Camionero": [
+            "firma_epis_caminero",
+            'maq_conductor_aut',
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+
+        "Producción": [
+            "epis_general_entrega",
+            "maq_produccion_aut",
+            'it2_manejo_segadora',
+            'maq_semillero_aut',
+            "vehiculo_uso_conservacion_aut",
+            "entrega_info",
+        ],
+    };
+
+    function applyPresetForPuesto(puestoValue) {
+        if (!tiposGrid) return;
+
+        const preset = presetsPorPuesto[puestoValue] || null;
+
+        // Si no hay preset, no tocamos nada
+        if (!preset) return;
+
+        const wanted = new Set(preset);
+
+        for (const cb of tiposGrid.querySelectorAll('input[type="checkbox"][name="tipos[]"]')) {
+            cb.checked = wanted.has(cb.value);
+        }
+
+        refreshZipUI();
+    }
+
     // Cache de opciones originales (menos placeholder)
     const placeholderOpt = trabajador.querySelector('option[value=""]');
     const allOptions = [...trabajador.querySelectorAll('option')].filter(o => o.value !== '');
@@ -412,6 +473,7 @@
     puestoEl?.addEventListener('change', () => {
         refreshSummary();
         setChipActive();
+        applyPresetForPuesto((puestoEl?.value || '').trim());
         refreshZipUI();
     });
 
