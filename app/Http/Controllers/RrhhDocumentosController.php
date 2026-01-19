@@ -78,18 +78,19 @@ class RrhhDocumentosController extends Controller
     private function buildPdfForTipo(string $tipo, TrabajadorPolifonia $t, string $puesto, string $fecha, string $templateAbs): ?string
     {
         return match ($tipo) {
-            'epis_fumigador_entrega' => $this->buildEpisFumigadorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_facilitador_pedidos_aut' => $this->buildMaqFacilitadorPedidosPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'epis_general_entrega'   => $this->buildEpisGeneralPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_produccion_aut'     => $this->buildMaqProduccionPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'epis_bandejero_entrega' => $this->buildEpisBandejeroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_semillero_aut'     => $this->buildMaqSemilleroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'epis_soldador_entrega' => $this->buildEpisSoldadorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_conductor_aut'     => $this->buildMaqCondcutorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_siembra_aut'     => $this->buildMaqSiembraPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_bandejero_aut'     => $this->buildMaqBandejeroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_empaquetadora_injertadora_aut'     => $this->buildMaqEmpaquetadoraPdf($t, $fecha, $puesto, $templateAbs, $tipo),
-            'maq_jefe_azul_aut'     => $this->buildMaqJefeAzulPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'epis_fumigador_entrega'            => $this->buildEpisFumigadorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_facilitador_pedidos_aut'       => $this->buildMaqFacilitadorPedidosPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'epis_general_entrega'              => $this->buildEpisGeneralPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_produccion_aut'                => $this->buildMaqProduccionPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'epis_bandejero_entrega'            => $this->buildEpisBandejeroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_semillero_aut'                 => $this->buildMaqSemilleroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'epis_soldador_entrega'             => $this->buildEpisSoldadorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_conductor_aut'                 => $this->buildMaqCondcutorPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_siembra_aut'                   => $this->buildMaqSiembraPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_bandejero_aut'                 => $this->buildMaqBandejeroPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_empaquetadora_injertadora_aut' => $this->buildMaqEmpaquetadoraPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'maq_jefe_azul_aut'                 => $this->buildMaqJefeAzulPdf($t, $fecha, $puesto, $templateAbs, $tipo),
+            'entrega_info'                      => $this->buildEntregaInfo($t, $fecha, $puesto, $templateAbs, $tipo),
             default => null,
         };
     }
@@ -803,6 +804,47 @@ class RrhhDocumentosController extends Controller
         ];
 
         $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', (string) ($t->nombre ?? 'trabajador'));
+        $safeNombre = trim(preg_replace('/\s+/', ' ', $safeNombre));
+        $safeNombre = str_replace(' ', '_', $safeNombre);
+
+        $outAbs = storage_path(
+            'app/tmp/rrhh_pdf_' . $tipo . '_' .
+            $safeNombre . '_' . date('Ymd_His') . '_' . Str::random(6) . '.pdf'
+        );
+
+        $this->fillPdfWithPdftk($templateAbs, $fields, $outAbs);
+
+        return $outAbs;
+    }
+
+    private function buildEntregaInfo(
+        TrabajadorPolifonia $t,
+        string $fecha,
+        string $puesto,
+        string $templateAbs,
+        string $tipo
+    ): string
+    {
+        $fechaFmt = \Carbon\Carbon::parse($fecha)
+            ->locale('es')
+            ->translatedFormat('j \\d\\e F \\d\\e Y');
+
+        $nombreSolo = trim(preg_replace('/\s+/', ' ', (string) ($t->nombre ?? '')));
+        $dni        = (string) ($t->nif ?? '');
+        $tfno       = (string) ($t->tfno ?? ''); // ajusta si el campo se llama movil/tlf/etc.
+
+        // Helper encoding (evita "utilizaciÃ³n")
+        $enc = fn ($s) => mb_convert_encoding((string) $s, 'ISO-8859-1', 'UTF-8');
+
+        $fields = [
+            'nombreyapellidos' => $enc($nombreSolo),
+            'dni'              => $enc($dni),
+            'tfno'             => $enc($tfno),
+            'puesto'           => $enc($puesto),
+            'fecha'            => $enc($fechaFmt),
+        ];
+
+        $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', $nombreSolo);
         $safeNombre = trim(preg_replace('/\s+/', ' ', $safeNombre));
         $safeNombre = str_replace(' ', '_', $safeNombre);
 
