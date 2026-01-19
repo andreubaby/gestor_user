@@ -91,6 +91,7 @@ class RrhhDocumentosController extends Controller
             'maq_empaquetadora_injertadora_aut' => $this->buildMaqEmpaquetadoraPdf($t, $fecha, $puesto, $templateAbs, $tipo),
             'maq_jefe_azul_aut'                 => $this->buildMaqJefeAzulPdf($t, $fecha, $puesto, $templateAbs, $tipo),
             'entrega_info'                      => $this->buildEntregaInfo($t, $fecha, $puesto, $templateAbs, $tipo),
+            'vehiculo_uso_conservacion_aut'     => $this->buildVehiculoUso($t, $fecha, $puesto, $templateAbs, $tipo),
             default => null,
         };
     }
@@ -842,6 +843,49 @@ class RrhhDocumentosController extends Controller
             'tfno'             => $enc($tfno),
             'puesto'           => $enc($puesto),
             'fecha'            => $enc($fechaFmt),
+        ];
+
+        $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', $nombreSolo);
+        $safeNombre = trim(preg_replace('/\s+/', ' ', $safeNombre));
+        $safeNombre = str_replace(' ', '_', $safeNombre);
+
+        $outAbs = storage_path(
+            'app/tmp/rrhh_pdf_' . $tipo . '_' .
+            $safeNombre . '_' . date('Ymd_His') . '_' . Str::random(6) . '.pdf'
+        );
+
+        $this->fillPdfWithPdftk($templateAbs, $fields, $outAbs);
+
+        return $outAbs;
+    }
+
+    private function buildVehiculoUso(
+        TrabajadorPolifonia $t,
+        string $fecha,
+        string $puesto,
+        string $templateAbs,
+        string $tipo
+    ): string
+    {
+        // Nombre normalizado
+        $nombreSolo = trim(preg_replace('/\s+/', ' ', (string) ($t->nombre ?? '')));
+        // ✅ Acción 3: nombre + DNI juntos para que el DNI "se mueva" con el nombre
+        $nombreConDni = trim(
+            $nombreSolo .
+            (!empty($t->nif) ? ' con D.N.I. ' . (string) $t->nif : '') .
+            ' a la utilización'
+        );
+
+        // Encoding robusto (evita "utilizaciÃ³n" y similares)
+        $toPdfEnc = function ($s) {
+            $s = trim(preg_replace('/\s+/', ' ', (string) $s));
+            // iconv suele ir fino con pdftk en muchos servidores
+            $out = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $s);
+            return $out !== false ? $out : mb_convert_encoding($s, 'ISO-8859-1', 'UTF-8');
+        };
+
+        $fields = [
+            'nombreyapellidos' => $toPdfEnc($nombreConDni),
         ];
 
         $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', $nombreSolo);
