@@ -135,6 +135,13 @@ return [
             'filename' => 'Plantilla_Autorizacion_Maquinaria_{nombre}_{dni}_{fecha}.pdf',
             'category' => 'Plantillas',
         ],
+
+        'entrega_info' => [
+            'label'    => 'Entrega de informacion Firma',
+            'template' => 'rrhh_templates/Entrega de informacion Firma.pdf',
+            'filename' => 'Plantilla_Entrega_informacion_{nombre}_{dni}_{fecha}.pdf',
+            'category' => 'Firmas',
+        ],
     ],
 
     /*
