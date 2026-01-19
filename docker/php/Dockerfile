@@ -2,6 +2,7 @@ FROM php:8.4-fpm
 
 RUN apt-get update && apt-get install -y \
     git unzip zip curl \
+    pdftk-java \
     libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
     libonig-dev libxml2-dev libzip-dev \
  && docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -13,11 +14,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 
-# Evita "dubious ownership" + permisos correctos antes de composer
 RUN git config --global --add safe.directory /var/www/html \
  && chown -R www-data:www-data /var/www/html
 
-# Instala deps (como root está bien; si quieres, luego cambias a www-data)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
  && test -f /var/www/html/vendor/autoload.php
 
@@ -26,4 +25,3 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 EXPOSE 9000
 CMD ["php-fpm"]
-
