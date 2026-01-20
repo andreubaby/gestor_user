@@ -93,6 +93,7 @@ class RrhhDocumentosController extends Controller
             'entrega_info'                      => $this->buildEntregaInfo($t, $fecha, $puesto, $templateAbs, $tipo),
             'vehiculo_uso_conservacion_aut'     => $this->buildVehiculoUso($t, $fecha, $puesto, $templateAbs, $tipo),
             'it2_manejo_segadora'               => $this->buildManejoSeg($t, $fecha, $puesto, $templateAbs, $tipo),
+            'entrega_video'                     => $this->buildVideos($t, $fecha, $puesto, $templateAbs, $tipo),
             default => null,
         };
     }
@@ -904,6 +905,47 @@ class RrhhDocumentosController extends Controller
     }
 
     private function buildManejoSeg(
+        TrabajadorPolifonia $t,
+        string $fecha,
+        string $puesto,
+        string $templateAbs,
+        string $tipo
+    ): string
+    {
+        $fechaFmt = \Carbon\Carbon::parse($fecha)
+            ->locale('es')
+            ->translatedFormat('j \\d\\e F \\d\\e Y');
+
+        $nombreSolo = trim(preg_replace('/\s+/', ' ', (string) ($t->nombre ?? '')));
+        $dni        = (string) ($t->nif ?? '');
+        $tfno       = (string) ($t->tfno ?? ''); // ajusta si el campo se llama movil/tlf/etc.
+
+        // Helper encoding (evita "utilizaciÃ³n")
+        $enc = fn ($s) => mb_convert_encoding((string) $s, 'ISO-8859-1', 'UTF-8');
+
+        $fields = [
+            'nombreyapellidos' => $enc($nombreSolo),
+            'dni'              => $enc($dni),
+            'tfno'             => $enc($tfno),
+            'puesto'           => $enc($puesto),
+            'fecha'            => $enc($fechaFmt),
+        ];
+
+        $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', $nombreSolo);
+        $safeNombre = trim(preg_replace('/\s+/', ' ', $safeNombre));
+        $safeNombre = str_replace(' ', '_', $safeNombre);
+
+        $outAbs = storage_path(
+            'app/tmp/rrhh_pdf_' . $tipo . '_' .
+            $safeNombre . '_' . date('Ymd_His') . '_' . Str::random(6) . '.pdf'
+        );
+
+        $this->fillPdfWithPdftk($templateAbs, $fields, $outAbs);
+
+        return $outAbs;
+    }
+
+    private function buildVideos(
         TrabajadorPolifonia $t,
         string $fecha,
         string $puesto,
