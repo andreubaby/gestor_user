@@ -368,17 +368,20 @@
             "maq_siembra_aut",
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
         "Oficina": [
             "epis_general_entrega",
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
         "Bandejero": [
             "epis_bandejero_entrega",
             "maq_bandejero_aut",
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
 
         "Injertos": [
@@ -386,6 +389,7 @@
             "maq_empaquetadora_injertadora_aut",
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
 
         "Camionero": [
@@ -393,6 +397,7 @@
             'maq_conductor_aut',
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
 
         "Producción": [
@@ -402,6 +407,7 @@
             'maq_semillero_aut',
             "vehiculo_uso_conservacion_aut",
             "entrega_info",
+            'entrega_video',
         ],
     };
 

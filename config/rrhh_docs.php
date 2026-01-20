@@ -134,6 +134,13 @@ return [
             'filename' => 'Plantilla_Entrega_informacion_{nombre}_{dni}_{fecha}.pdf',
             'category' => 'Firmas',
         ],
+
+        'entrega_video' => [
+            'label'    => 'Entrega de videos Formación',
+            'template' => 'rrhh_templates/Videos Formacion.pdf',
+            'filename' => 'Entrega_Videos_{nombre}_{dni}_{fecha}.pdf',
+            'category' => 'Firmas',
+        ],
     ],
 
     /*
