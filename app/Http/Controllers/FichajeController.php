@@ -268,9 +268,9 @@ class FichajeController extends Controller
 
         // 3) Unificar + ordenar por fecha+hora (para que los punches queden finos)
         $rows = $antiguos
+            ->toBase()
             ->merge($punches)
             ->sortByDesc(function ($r) {
-                // ordenar por datetime si podemos
                 $f = $r['fecha'] ?? '0000-00-00';
                 $h = $r['hora'] ?? '00:00';
                 return $f . ' ' . $h;
