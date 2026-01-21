@@ -1220,7 +1220,10 @@ function openFichajesModal(el) {
 
             // TEST VISUAL (si esto NO aparece, el UL no está en pantalla o se oculta por CSS)
             if (list) {
-                list.innerHTML = `<li class="py-2 text-sm text-green-700">✅ TEST: tengo ${rows.length} filas</li>`;
+                const li = document.createElement('li');
+                li.className = 'py-2 text-sm text-green-700';
+                li.textContent = `✅ TEST: tengo ${rows.length} filas`;
+                list.replaceChildren(li);
             }
 
             // ---------- Render real con try/catch ----------
@@ -1327,7 +1330,7 @@ function openFichajesModal(el) {
 
                             const origenNorm = String(r.origen || '').toLowerCase();
 
-// 🎨 Colores suaves por tipo (entrada/salida)
+                            // 🎨 Colores suaves por tipo (entrada/salida)
                             const cardClass =
                                 origenNorm === 'entrada'
                                     ? 'bg-emerald-50 ring-emerald-200'
