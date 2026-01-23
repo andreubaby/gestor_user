@@ -218,10 +218,15 @@
             <tbody class="divide-y divide-slate-100" id="tbodyFichajes">
             @forelse($rows as $r)
                 @php
-                    $ha = (($r->count ?? 0) > 0);
+                    // Antes usabas count>0 como "ha fichado".
+                    // Ahora: estado depende de In/Out.
                     $entrada = $r->first_in ?? null;
                     $salida  = $r->last_out ?? null;
 
+                    $hasIn  = !empty($entrada);
+                    $hasOut = !empty($salida);
+
+                    // Ausencia
                     $absence = $r->absence_tipo ?? null; // 'V'|'P'|'B'|null
                     $absenceLabel = match($absence) {
                         'V' => '🏖 Vacaciones',
@@ -236,12 +241,21 @@
                     $rowTone     = 'bg-slate-50';
 
                     if ($r->vinculado_fichajes) {
-                        if ($ha) {
+
+                        // ✅ 1) Si tiene salida => "Fichó"
+                        if ($hasOut) {
                             $estadoBadge = 'bg-emerald-100 text-emerald-800';
                             $estadoText  = '✅ Fichó';
                             $rowTone     = 'bg-emerald-50/60';
+
+                        // ✅ 2) Si solo tiene entrada => "Entrada"
+                        } elseif ($hasIn) {
+                            $estadoBadge = 'bg-sky-100 text-sky-800';
+                            $estadoText  = '⏱ Entrada';
+                            $rowTone     = 'bg-sky-50/60';
+
+                        // ✅ 3) Si no tiene nada => ausencia o no fichó
                         } else {
-                            // ✅ si no fichó pero está en ausencia -> mostrar causa
                             if ($absenceLabel) {
                                 $estadoBadge = 'bg-amber-100 text-amber-800';
                                 $estadoText  = $absenceLabel;
@@ -252,38 +266,34 @@
                                 $rowTone     = 'bg-red-50/50';
                             }
                         }
+
                     } else {
                         $estadoBadge = 'bg-slate-100 text-slate-600';
                         $estadoText  = '⚠ No vinculado';
                         $rowTone     = 'bg-slate-50';
                     }
 
-                    // chips horas
-                    $chipInClass  = $entrada ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
-                    $chipOutClass = $salida  ? 'bg-red-100 text-red-700 ring-1 ring-red-200'           : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
+                    // chips horas (igual que antes)
+                    $chipInClass  = $hasIn  ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
+                    $chipOutClass = $hasOut ? 'bg-red-100 text-red-700 ring-1 ring-red-200'             : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200';
 
                     $exportParams = array_merge(request()->query(), [
                         'trabajador_id' => $r->trabajador_id ?? $r->id ?? null,
                     ]);
 
-                    // ✅ para el toggle: "no fichó real" = vinculado + !ha + !absence
-                    $isNoReal = ($r->vinculado_fichajes && !$ha && !$absenceLabel);
+                    // ✅ para el toggle: "no fichó real" = vinculado + sin In + sin Out + sin ausencia
+                    $isNoReal = ($r->vinculado_fichajes && !$hasIn && !$hasOut && !$absenceLabel);
 
-                   // ✅ Override para INACTIVOS: mostrar "--" en gris en vez de "No fichó"
+                    // ✅ Override para INACTIVOS
                     if (isset($r->activo) && (int)$r->activo === 0) {
-                        // Si quieres que SIEMPRE ponga "--" aunque tuviera otros estados:
                         $estadoBadge = 'bg-slate-100 text-slate-400';
                         $estadoText  = '--';
                         $rowTone     = 'bg-slate-50';
-
-                        // (Opcional) también poner chips en gris si quieres:
-                        // $chipInClass  = 'bg-slate-100 text-slate-400 ring-1 ring-slate-200';
-                        // $chipOutClass = 'bg-slate-100 text-slate-400 ring-1 ring-slate-200';
                     }
                 @endphp
 
                 <tr class="transition hover:bg-emerald-50/40 {{ $rowTone }}"
-                    data-has="{{ $ha ? 1 : 0 }}"
+                    data-has="{{ $hasOut ? 1 : 0 }}"
                     data-vinc="{{ $r->vinculado_fichajes ? 1 : 0 }}"
                     data-noreal="{{ $isNoReal ? 1 : 0 }}">
                     <td class="px-6 py-4">
