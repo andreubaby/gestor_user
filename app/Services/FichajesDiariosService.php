@@ -436,6 +436,7 @@ class FichajesDiariosService
             $sheet = $spreadsheet->createSheet();
             $sheet->setTitle($sheetName);
 
+            // ===== Cabecera superior =====
             $sheet->setCellValue('A1', 'Trabajador');
             $sheet->setCellValue('B1', $t->nombre);
             $sheet->setCellValue('A2', 'Email');
@@ -443,7 +444,28 @@ class FichajesDiariosService
             $sheet->setCellValue('A3', 'Mes');
             $sheet->setCellValue('B3', $month);
 
+            // Estilo cabecera superior
+            $sheet->getStyle('A1:A3')->getFont()->setBold(true);
+            $sheet->getStyle('A1:B3')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+            $sheet->getStyle('A1:B3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+
+            // Línea de separación
+            $sheet->setCellValue('A4', '');
+            $sheet->mergeCells('A4:E4');
+
+            // ===== Cabecera tabla =====
             $sheet->fromArray(['Fecha', 'Entrada', 'Salida', 'Horas (hh:mm)', 'Origen'], null, 'A5');
+
+            // Estilo cabecera tabla
+            $sheet->getStyle('A5:E5')->getFont()->setBold(true);
+            $sheet->getStyle('A5:E5')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('A5:E5')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
+            $sheet->getStyle('A5:E5')->getFill()->getStartColor()->setARGB('FF15803D'); // verde
+            $sheet->getStyle('A5:E5')->getFont()->getColor()->setARGB('FFFFFFFF'); // blanco
+
+            // Congelar y filtros
+            $sheet->freezePane('A6');
+            $sheet->setAutoFilter('A5:E5');
 
             $rows = [];
             $totalMinutes = 0;
@@ -462,8 +484,14 @@ class FichajesDiariosService
                 $lastOut = optional($dayPunches->reverse()->firstWhere('type', 'out'))['datetime'] ?? null;
 
                 $shiftType = $t->turno ?? 'office'; // campaign/office/intensive
-                $worked = $this->calcWorkedMinutesWithBreaks($dayPunches, $shiftType); // ✅ aquí ya aplica la regla campaign sin comida si acaban <= 16:00
-                $totalMinutes += $worked;
+
+                // ✅ Evitar 00:00 cuando solo hay entrada (sin salida):
+                // Solo calculamos horas si existe OUT.
+                $worked = null;
+                if ($lastOut) {
+                    $worked = $this->calcWorkedMinutesWithBreaks($dayPunches, $shiftType);
+                    $totalMinutes += $worked;
+                }
 
                 $origins = $dayPunches->pluck('origen')->unique()->values()->all();
                 $originLabel = count($origins) > 1 ? 'mixto' : ($origins[0] ?? '—');
@@ -472,7 +500,7 @@ class FichajesDiariosService
                     $dayKey,
                     $firstIn ? $firstIn->format('H:i') : '—',
                     $lastOut ? $lastOut->format('H:i') : '—',
-                    $this->fmtMinutes($worked),
+                    $worked === null ? '—' : $this->fmtMinutes($worked),
                     $originLabel,
                 ];
 
@@ -482,10 +510,57 @@ class FichajesDiariosService
             $startRow = 6;
             $sheet->fromArray($rows, null, 'A'.$startRow);
 
-            $totalRow = $startRow + count($rows) + 1;
-            $sheet->setCellValue('A'.$totalRow, 'TOTAL');
-            $sheet->setCellValue('D'.$totalRow, $this->fmtMinutes($totalMinutes));
+            $lastDataRow = $startRow + count($rows) - 1;
 
+            // Bordes + alineación tabla
+            if ($lastDataRow >= $startRow) {
+                $range = "A5:E{$lastDataRow}";
+                $sheet->getStyle($range)->getBorders()->getAllBorders()
+                    ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)
+                    ->getColor()->setARGB('FFE2E8F0'); // gris suave
+
+                $sheet->getStyle("A{$startRow}:A{$lastDataRow}")
+                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+
+                $sheet->getStyle("B{$startRow}:D{$lastDataRow}")
+                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+                $sheet->getStyle("E{$startRow}:E{$lastDataRow}")
+                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+                // Resaltar filas:
+                // - Entrada sin salida => ámbar suave
+                // - No fichó (sin in y sin out) => rojo suave
+                for ($r = $startRow; $r <= $lastDataRow; $r++) {
+                    $in  = (string)$sheet->getCell("B{$r}")->getValue();
+                    $out = (string)$sheet->getCell("C{$r}")->getValue();
+
+                    if ($in !== '—' && $out === '—') {
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()
+                            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF7ED'); // ámbar suave
+                    } elseif ($in === '—' && $out === '—') {
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()
+                            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF1F2'); // rojo suave
+                    }
+                }
+            }
+
+            // TOTAL bonito
+            $totalRow = $lastDataRow + 2;
+            $sheet->setCellValue("A{$totalRow}", 'TOTAL');
+            $sheet->setCellValue("D{$totalRow}", $this->fmtMinutes($totalMinutes));
+
+            $sheet->mergeCells("A{$totalRow}:C{$totalRow}");
+            $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFont()->setBold(true);
+            $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
+            $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFill()->getStartColor()->setARGB('FFF1F5F9'); // gris suave
+            $sheet->getStyle("D{$totalRow}")->getAlignment()
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+            // AutoSize columnas
             foreach (range('A', 'E') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
@@ -523,6 +598,7 @@ class FichajesDiariosService
 
         return response()->download($tmpPath, $fileName)->deleteFileAfterSend(true);
     }
+
 
     // ==========================
     // Helpers

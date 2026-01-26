@@ -47,19 +47,21 @@ class AusenciasService
 
     public function storeDays(int $trabajadorId, array $data): array
     {
-        $bucketYear = $data['tipo'] === 'V'
+        $tipo = strtoupper($data['tipo']); // <-- NUEVO
+
+        $bucketYear = $tipo === 'V'
             ? (int)($data['bucket_year'] ?? $data['calendar_year'])
             : (int)$data['calendar_year'];
 
         $period = CarbonPeriod::create($data['from'], $data['to']);
         $dates = collect($period)->map(fn($d) => $d->format('Y-m-d'))->values();
 
-        DB::connection('mysql_polifonia')->transaction(function () use ($trabajadorId, $data, $dates, $bucketYear) {
+        DB::connection('mysql_polifonia')->transaction(function () use ($trabajadorId, $data, $dates, $bucketYear, $tipo) {
 
             if ($data['mode'] === 'remove') {
                 DB::connection('mysql_polifonia')->table('trabajadores_dias')
                     ->where('trabajador_id', $trabajadorId)
-                    ->where('tipo', $data['tipo'])
+                    ->where('tipo', $tipo)              // <-- usa $tipo
                     ->where('vacation_year', $bucketYear)
                     ->whereIn('fecha', $dates)
                     ->delete();
@@ -83,7 +85,7 @@ class AusenciasService
                     'trabajador_id' => $trabajadorId,
                     'fecha' => $date,
                     'vacation_year' => $bucketYear,
-                    'tipo' => $data['tipo'],
+                    'tipo' => $tipo,                    // <-- usa $tipo
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -101,7 +103,18 @@ class AusenciasService
     {
         try {
             $tipoRaw = $tipo;
-            $tipo = strtoupper($tipoRaw); // V|P|B
+            $tipo = strtoupper($tipoRaw); // V|P|B|L
+
+            // ✅ Validación fuerte del tipo
+            if (!in_array($tipo, ['V','P','B','L'], true)) {
+                Log::warning('[PDF STREAM] INVALID TIPO', [
+                    'trabajadorId' => $trabajadorId,
+                    'vacationYear' => $vacationYear,
+                    'tipo_raw'     => $tipoRaw,
+                    'tipo_norm'    => $tipo,
+                ]);
+                abort(400, 'Tipo de ausencia inválido');
+            }
 
             Log::info('[PDF STREAM] ENTER', [
                 'trabajadorId'   => $trabajadorId,
@@ -197,6 +210,7 @@ class AusenciasService
                 'V' => 'vacaciones',
                 'P' => 'permisos',
                 'B' => 'bajas',
+                'L' => 'libres',
                 default => 'ausencias',
             };
 
@@ -306,30 +320,39 @@ class AusenciasService
             'vacaciones' => ['count' => 0, 'items' => []],
             'permiso'    => ['count' => 0, 'items' => []],
             'baja'       => ['count' => 0, 'items' => []],
+            'libre'      => ['count' => 0, 'items' => []], // <-- NUEVO
         ];
 
-        // sets para contar días únicos por tipo
         $seen = [
             'vacaciones' => [],
             'permiso'    => [],
             'baja'       => [],
+            'libre'      => [], // <-- NUEVO
         ];
 
         foreach ($rows as $r) {
-            $key = $r->tipo === 'V' ? 'vacaciones' : ($r->tipo === 'P' ? 'permiso' : 'baja');
+            $tipo = strtoupper($r->tipo);
+
+            $key = match ($tipo) {
+                'V' => 'vacaciones',
+                'P' => 'permiso',
+                'B' => 'baja',
+                'L' => 'libre',
+                default => null,
+            };
+
+            if ($key === null) {
+                continue; // o registra/Log si quieres detectar tipos raros
+            }
 
             $fecha = is_string($r->fecha)
                 ? $r->fecha
                 : \Carbon\Carbon::parse($r->fecha)->format('Y-m-d');
 
-            // bucket_year solo si aplica
             $bucket = $includeBucketYear ? (int)$r->vacation_year : null;
 
-            // clave única: por fecha (y si incluyes bucket, diferéncialo)
-            $uniqKey = $fecha; // ✅ contar siempre por día real (fecha)
+            $uniqKey = $fecha;
 
-
-            // si ya está, saltar (evita duplicados)
             if (isset($seen[$key][$uniqKey])) {
                 continue;
             }
@@ -341,10 +364,10 @@ class AusenciasService
             $out[$key]['items'][] = $item;
         }
 
-        // count = nº de días únicos
         $out['vacaciones']['count'] = count($seen['vacaciones']);
         $out['permiso']['count']    = count($seen['permiso']);
         $out['baja']['count']       = count($seen['baja']);
+        $out['libre']['count']      = count($seen['libre']); // <-- NUEVO
 
         return $out;
     }

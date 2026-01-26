@@ -7,6 +7,7 @@ let AUS = {
         vacaciones: new Set(),
         permiso: new Set(),
         baja: new Set(),
+        libre: new Set(),
     },
     rangeStart: null,
     rangeEnd: null,
@@ -84,9 +85,9 @@ async function openAusenciasModal(btnEl, tab){
 
     AUS = {
         nombre,
-        data: { vacaciones:{count:0,items:[]}, permiso:{count:0,items:[]}, baja:{count:0,items:[]} },
+        data: { vacaciones:{count:0,items:[]}, permiso:{count:0,items:[]}, baja:{count:0,items:[]}, libre:{count:0,items:[]} },
         tab: tab || 'vacaciones',
-        selected: { vacaciones:new Set(), permiso:new Set(), baja:new Set() },
+        selected: { vacaciones:new Set(), permiso:new Set(), baja:new Set(), libre:new Set() },
         rangeStart: null,
         rangeEnd: null,
         workerId: workerId,
@@ -176,6 +177,7 @@ function closeAusenciasModal(){
             vacaciones: new Set(),
             permiso: new Set(),
             baja: new Set(),
+            libre: new Set(),
         },
         rangeStart: null,
         rangeEnd: null,
@@ -220,16 +222,19 @@ function updateTabBadges() {
     const vacBack = countDaysInItems(AUS.data?.vacaciones?.items);
     const perBack = countDaysInItems(AUS.data?.permiso?.items);
     const bajBack = countDaysInItems(AUS.data?.baja?.items);
+    const libBack = countDaysInItems(AUS.data?.libre?.items);
 
     setTabBadge(document.getElementById("tabVac"), "🏖", "Vacaciones", vacBack);
     setTabBadge(document.getElementById("tabPer"), "📝", "Permisos", perBack);
     setTabBadge(document.getElementById("tabBaj"), "🏥", "Bajas", bajBack);
+    setTabBadge(document.getElementById("tabLib"), "🕒", "Libres", libBack);
 }
 
 function applyTabStyles(){
     const tabVac = document.getElementById('tabVac');
     const tabPer = document.getElementById('tabPer');
     const tabBaj = document.getElementById('tabBaj');
+    const tabLib = document.getElementById('tabLib');
 
     const base = "px-3 py-1.5 rounded-lg text-sm font-medium transition focus:outline-none";
 
@@ -242,9 +247,13 @@ function applyTabStyles(){
     const bajInactive = "bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100";
     const bajActive   = "bg-red-100 text-red-800 ring-2 ring-red-300";
 
+    const libInactive = "bg-slate-50 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100";
+    const libActive   = "bg-slate-100 text-slate-900 ring-2 ring-slate-300";
+
     if (tabVac) tabVac.className = `${base} ${AUS.tab==='vacaciones' ? vacActive : vacInactive}`;
     if (tabPer) tabPer.className = `${base} ${AUS.tab==='permiso'    ? perActive : perInactive}`;
     if (tabBaj) tabBaj.className = `${base} ${AUS.tab==='baja'       ? bajActive : bajInactive}`;
+    if (tabLib) tabLib.className = `${base} ${AUS.tab==='libre' ? libActive : libInactive}`;
 }
 
 function switchAusTab(tab){
@@ -324,7 +333,11 @@ function renderAusencias(){
     const items = (AUS.data && AUS.data[t] && AUS.data[t].items) ? AUS.data[t].items : [];
     const count = (AUS.data && AUS.data[t] && typeof AUS.data[t].count !== 'undefined') ? AUS.data[t].count : 0;
 
-    const label = (t === 'vacaciones') ? 'Vacaciones' : (t === 'permiso' ? 'Permisos' : 'Bajas');
+    const label =
+        (t === 'vacaciones') ? 'Vacaciones' :
+            (t === 'permiso')    ? 'Permisos' :
+                (t === 'baja')       ? 'Bajas' :
+                    'Libres';
     if (sub) sub.textContent = `${label} · ${count} día(s) · ${CAL.year}`;
 
     // ✅ IMPORTANTE: busy de TODAS las categorías (no solo del tab actual)
@@ -365,7 +378,8 @@ function renderAusencias(){
 function tabToTipo(tab){
     if (tab === 'vacaciones') return 'V';
     if (tab === 'permiso') return 'P';
-    return 'B';
+    if (tab === 'baja') return 'B';
+    return 'L';
 }
 
 async function saveRangeToServer({ workerId, calendarYear, bucketYear, tab, from, to, mode }) {
@@ -422,7 +436,7 @@ function downloadCalendarPdf() {
     const tipo = tabToTipo(AUS.tab);
 
     // 1) Validar tipo (whitelist)
-    if (!['V', 'P', 'B'].includes(tipo)) return;
+    if (!['V','P','B','L'].includes(tipo)) return;
 
     // 2) Validar workerId (solo números)
     const workerId = String(AUS.workerId ?? '').trim();
@@ -432,23 +446,30 @@ function downloadCalendarPdf() {
     const bucketYear = Number(AUS.bucketYear);
     if (!Number.isInteger(bucketYear) || bucketYear < 2000 || bucketYear > 2100) return;
 
-    const routeKey = (tipo === 'V') ? 'pdfVac' : (tipo === 'P') ? 'pdfPer' : 'pdfBaj';
+    // ✅ RUTA SEGÚN TIPO (incluye L)
+    const routeKey =
+        (tipo === 'V') ? 'pdfVac' :
+            (tipo === 'P') ? 'pdfPer' :
+                (tipo === 'B') ? 'pdfBaj' :
+                    'pdfLib';
+
     const template = window?.APP?.routes?.[routeKey];
     if (!template) return;
 
     // 4) Construir URL segura con URL() y forzar same-origin
     const urlBaseStr = template.replace('__ID__', workerId);
     const u = new URL(urlBaseStr, window.location.origin);
-
-    // Si por lo que sea el template trajera un dominio externo, lo bloqueamos
     if (u.origin !== window.location.origin) return;
 
-    // 5) Query params con URLSearchParams (evita concatenación insegura)
-    u.searchParams.set('vacation_year', String(bucketYear));
+    // ✅ Año: vacaciones usa bucketYear, el resto usa CAL.year (más coherente)
+    const yearForPdf = (tipo === 'V') ? bucketYear : Number(CAL.year);
+
+    u.searchParams.set('vacation_year', String(yearForPdf));
     u.searchParams.set('tipo', tipo);
 
     window.open(u.toString(), '_blank', 'noopener,noreferrer');
 }
+
 
 function renderMonthGrid(gridEl, year, month, busyMap, tab){
     const first = new Date(year, month, 1);
@@ -457,23 +478,24 @@ function renderMonthGrid(gridEl, year, month, busyMap, tab){
 
     const jsDay = first.getDay();
     const offset = (jsDay + 6) % 7;
-
     const totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
 
-    // ✅ sets backend
+    // ✅ sets backend (4)
     const busyVac = busyMap.vacaciones;
     const busyPer = busyMap.permiso;
     const busyBaj = busyMap.baja;
+    const busyLib = busyMap.libre;
 
     // ✅ set backend del tab actual (para permitir quitar)
     const busyCurrent =
         tab === 'vacaciones' ? busyVac :
             tab === 'permiso'    ? busyPer :
-                busyBaj;
+                tab === 'baja'       ? busyBaj :
+                    busyLib; // libre
 
     // ✅ backend de otras tabs (para bloquear)
     const busyOther = new Set();
-    ['vacaciones','permiso','baja'].forEach(t => {
+    ['vacaciones','permiso','baja','libre'].forEach(t => {
         if (t === tab) return;
         busyMap[t].forEach(d => busyOther.add(d));
     });
@@ -498,49 +520,47 @@ function renderMonthGrid(gridEl, year, month, busyMap, tab){
 
         const dateStr = formatDate(year, month+1, dayNum);
 
-        // selecciones (se pintan siempre)
+        // selecciones (4)
         const selVac = AUS.selected.vacaciones.has(dateStr);
         const selPer = AUS.selected.permiso.has(dateStr);
         const selBaj = AUS.selected.baja.has(dateStr);
+        const selLib = AUS.selected.libre.has(dateStr);
 
-        const isSelectedAny = selVac || selPer || selBaj;
+        const isSelectedAny = selVac || selPer || selBaj || selLib;
         const isSelectedCurrent = AUS.selected[tab].has(dateStr);
         const isBlockedByOtherSelection = isSelectedAny && !isSelectedCurrent;
 
-        // ✅ busy (backend) para las 3 categorías (se pintan siempre)
+        // ✅ busy backend (4)
         const isBusyVac = busyVac.has(dateStr);
         const isBusyPer = busyPer.has(dateStr);
         const isBusyBaj = busyBaj.has(dateStr);
+        const isBusyLib = busyLib.has(dateStr);
 
-        // ✅ ocupado por OTRAS categorías (backend)
         const isBusyOtherBackend = busyOther.has(dateStr);
-
-        // ✅ ocupado por tab actual (backend) -> permitir click para quitar
-        const isBusyCurrentBackend = busyCurrent.has(dateStr);
+        const isBusyCurrentBackend = busyCurrent.has(dateStr); // (lo usas si quieres)
 
         const isRangeMark = (dateStr === AUS.rangeStart);
 
         let pillCls = "w-9 h-9 sm:w-9 sm:h-9 rounded-full flex items-center justify-center ";
 
         // prioridad visual:
-        // 1) seleccionado (tu selección actual en UI)
+        // 1) seleccionado
         if (selVac) pillCls += selectedColorForTab('vacaciones');
         else if (selPer) pillCls += selectedColorForTab('permiso');
         else if (selBaj) pillCls += selectedColorForTab('baja');
+        else if (selLib) pillCls += selectedColorForTab('libre');
 
-        // 2) si no hay selección, pintar busy EXISTENTE de cualquier tipo
+        // 2) busy existente
         else if (isBusyVac) pillCls += busyColorForTab('vacaciones');
         else if (isBusyPer) pillCls += busyColorForTab('permiso');
         else if (isBusyBaj) pillCls += busyColorForTab('baja');
+        else if (isBusyLib) pillCls += busyColorForTab('libre');
         else pillCls += "bg-white text-gray-800";
 
-        // ✅ si está bloqueado por otra selección o por backend de otra categoría
         const blockedMark = (isBlockedByOtherSelection || isBusyOtherBackend)
             ? "opacity-80 ring-1 ring-black/10"
             : "";
 
-        // ✅ si está ocupado por otra categoría (backend) lo deshabilito totalmente
-        // (si prefieres que deje clicar y muestre toast, quita este disabled y lo controlas en onclick)
         if (isBusyOtherBackend) {
             cell.disabled = true;
             cell.className += " cursor-not-allowed opacity-70";
@@ -555,8 +575,6 @@ function renderMonthGrid(gridEl, year, month, busyMap, tab){
                 toastMsg('⚠️ Ese día ya está seleccionado en otra categoría.');
                 return;
             }
-
-            // (si no lo deshabilitas arriba) bloquea backend de otra categoría:
             if (isBusyOtherBackend){
                 toastMsg('⚠️ Ese día está ocupado por otra ausencia.');
                 return;
@@ -1005,15 +1023,19 @@ function updateRowCounts(workerId, data){
     const vac = data?.vacaciones?.count ?? 0;
     const per = data?.permiso?.count ?? 0;
     const baj = data?.baja?.count ?? 0;
+    const lib = data?.libre?.count ?? 0;
 
     const vacEl = document.getElementById(`vacCount-${workerId}`);
     const perEl = document.getElementById(`perCount-${workerId}`);
     const bajEl = document.getElementById(`bajCount-${workerId}`);
+    const libEl = document.getElementById(`libCount-${workerId}`);
 
     if (vacEl) vacEl.textContent = vac;
     if (perEl) perEl.textContent = per;
     if (bajEl) bajEl.textContent = baj;
+    if (libEl) libEl.textContent = lib;
 }
+
 
 function buildBusySet(items){
     const set = new Set();
@@ -1045,6 +1067,7 @@ function buildGlobalBusyMap(){
         vacaciones: buildBusySetForTab('vacaciones'),
         permiso:    buildBusySetForTab('permiso'),
         baja:       buildBusySetForTab('baja'),
+        libre:      buildBusySetForTab('libre'),
     };
 }
 
@@ -1052,7 +1075,7 @@ function occupiedByOtherTabs(currentTab){
     const busy = buildGlobalBusyMap();
 
     const occ = new Set();
-    ['vacaciones','permiso','baja'].forEach(t => {
+    ['vacaciones','permiso','baja','libre'].forEach(t => {
         if (t === currentTab) return;
         busy[t].forEach(d => occ.add(d));          // existente backend
         AUS.selected[t].forEach(d => occ.add(d));  // seleccionado sesión
@@ -1081,7 +1104,8 @@ function rangeDates(a, b){
 function selectedColorForTab(tab){
     if (tab === 'vacaciones') return "bg-emerald-200 text-emerald-900 font-semibold";
     if (tab === 'permiso')    return "bg-yellow-200 text-yellow-900 font-semibold";
-    return "bg-red-200 text-red-900 font-semibold";
+    if (tab === 'baja')       return "bg-red-200 text-red-900 font-semibold";
+    return "bg-slate-200 text-slate-900 font-semibold"; // libre
 }
 
 function unionBusyAllTabs(){
@@ -1448,25 +1472,24 @@ async function handleDayClick(dateStr){
     const busyCurrent =
         tab === 'vacaciones' ? busyMap.vacaciones :
             tab === 'permiso'    ? busyMap.permiso :
-                busyMap.baja;
+                tab === 'baja'       ? busyMap.baja :
+                    busyMap.libre;
 
     // backend de OTRAS categorías
     const busyOther = new Set();
-    ['vacaciones','permiso','baja'].forEach(t => {
+    ['vacaciones','permiso','baja','libre'].forEach(t => {
         if (t === tab) return;
         busyMap[t].forEach(d => busyOther.add(d));
     });
 
     // selección en sesión de OTRAS categorías
-    const otherSel = occupiedByOtherTabs(tab);
+    const otherSel = occupiedByOtherTabs(tab); // 👈 asegúrate de que esa función también incluye 'libre'
 
-    // 🚫 no permitir empezar en un día ocupado por OTRA categoría (backend o selección)
     if (busyOther.has(dateStr) || otherSel.has(dateStr)) {
         toastMsg(`⚠️ Día inválido: ${dateStr} está ocupado por otra ausencia.`);
         return;
     }
 
-    // 1er click: inicio
     if (!AUS.rangeStart || (AUS.rangeStart && AUS.rangeEnd)){
         AUS.rangeStart = dateStr;
         AUS.rangeEnd = null;
@@ -1474,13 +1497,11 @@ async function handleDayClick(dateStr){
         return;
     }
 
-    // 2º click: fin
     AUS.rangeEnd = dateStr;
 
     const dates = rangeDates(AUS.rangeStart, AUS.rangeEnd);
     if (!dates.length) return;
 
-    // 🚫 el rango NO puede pisar otras categorías (backend o selección)
     const conflictOther = dates.find(d => busyOther.has(d) || otherSel.has(d));
     if (conflictOther){
         toastMsg(`⚠️ Rango inválido: ${conflictOther} está ocupado por otra ausencia.`);
@@ -1491,12 +1512,9 @@ async function handleDayClick(dateStr){
 
     const set = AUS.selected[tab];
 
-    // ✅ decide remove si TODO el rango ya existe en backend del tab actual
-    // (o está seleccionado localmente)
     const allPresentInThisTab = dates.every(d => busyCurrent.has(d) || set.has(d));
     const mode = allPresentInThisTab ? 'remove' : 'add';
 
-    // 🚫 si es add, NO puede pisar días ya ocupados en el tab actual (backend)
     if (mode === 'add'){
         const conflictAdd = dates.find(d => busyCurrent.has(d));
         if (conflictAdd){
@@ -1513,8 +1531,8 @@ async function handleDayClick(dateStr){
     try {
         const ok = await saveRangeToServer({
             workerId: AUS.workerId,
-            calendarYear: CAL.year,           // ✅ año que ves
-            bucketYear: AUS.bucketYear ?? CAL.year, // ✅ año de imputación
+            calendarYear: CAL.year,
+            bucketYear: AUS.bucketYear ?? CAL.year,
             tab,
             from,
             to,
@@ -1528,7 +1546,6 @@ async function handleDayClick(dateStr){
             return;
         }
 
-        // opcional: mantener selección local consistente
         if (mode === 'remove') dates.forEach(d => set.delete(d));
         else dates.forEach(d => set.add(d));
 
@@ -1562,7 +1579,8 @@ function formatDate(y, m, d){
 function busyColorForTab(tab){
     if (tab === 'vacaciones') return "bg-blue-200 text-blue-900 font-semibold";
     if (tab === 'permiso')    return "bg-amber-200 text-amber-900 font-semibold";
-    return "bg-red-200 text-red-900 font-semibold";
+    if (tab === 'baja')       return "bg-red-200 text-red-900 font-semibold";
+    return "bg-slate-200 text-slate-900 font-semibold"; // libre
 }
 
 document.addEventListener('keydown', (e) => {
