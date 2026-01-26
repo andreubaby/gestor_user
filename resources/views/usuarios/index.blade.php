@@ -460,6 +460,14 @@
                                     title="Ver bajas">
                                 🏥 Baj <span id="bajCount-{{ $registro->id }}">{{ $aus['baja']['count'] ?? 0 }}</span>
                             </button>
+
+                            <button type="button"
+                                    onclick="event.stopPropagation(); openAusenciasModal(this, 'libre')"
+                                    class="px-2 py-1 text-xs rounded-full font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition
+                                           focus:outline-none focus:ring-4 focus:ring-slate-200/50"
+                                    title="Ver libres">
+                                🕒 Lib <span id="libCount-{{ $registro->id }}">{{ $aus['libre']['count'] ?? 0 }}</span>
+                            </button>
                         </div>
                     </td>
 
@@ -580,6 +588,11 @@
                 <button type="button" id="tabBaj" onclick="switchAusTab('baja')"
                         class="px-3 py-1.5 rounded-lg text-sm font-medium transition focus:outline-none">
                     🏥 Bajas
+                </button>
+
+                <button type="button" id="tabLib" onclick="switchAusTab('libre')"
+                        class="px-3 py-1.5 rounded-lg text-sm font-medium transition focus:outline-none">
+                    🕒 Libres
                 </button>
             </div>
 

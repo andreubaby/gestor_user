@@ -409,7 +409,7 @@ class UsuarioController extends Controller
     {
         $data = $r->validate([
             'calendar_year' => 'required|integer',
-            'tipo' => 'required|in:V,P,B',
+            'tipo' => 'required|in:V,P,B,L',
             'from' => 'required|date',
             'to' => 'required|date',
             'mode' => 'required|in:add,remove',
