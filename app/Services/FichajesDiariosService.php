@@ -80,7 +80,7 @@ class FichajesDiariosService
          */
         $trabajadorIds = $trabajadores->pluck('id')->map(fn ($v) => (int)$v)->values();
 
-        $absenceMap = collect(); // trabajador_id => 'V'|'P'|'B'
+        $absenceMap = collect(); // trabajador_id => 'V'|'P'|'B'|'L'
         if ($trabajadorIds->isNotEmpty()) {
             $absRaw = DB::connection('mysql_polifonia') // ⚠️ cambia a tu conexión real si no es mysql
             ->table('trabajadores_dias')    // ⚠️ cambia si la tabla se llama distinto
@@ -90,6 +90,7 @@ class FichajesDiariosService
                 ->get();
 
             $prio = fn (string $tipo) => match (strtoupper($tipo)) {
+                'L' => 4,
                 'B' => 3,
                 'P' => 2,
                 'V' => 1,

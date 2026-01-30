@@ -4,7 +4,7 @@ return [
     'packs' => [
         'basico' => [
             'name'    => 'Pack básico (obligatorio)',
-            'subject' => 'Babyplant Cursos obligatorios',
+            'subject' => 'Información y bienvenida a Baby Plant SL',
             'intro'   => "Tras haber completado el curso de Riesgos Laborales 🦺✅, recuerda que también debemos realizar los siguientes cursos (muchos de ellos son de cumplimiento legal):\n\n1️⃣ Igualdad de género y prevención del acoso en el trabajo ⚖️\n2️⃣ Prevención del estrés térmico y golpe de calor + primeros auxilios ante calor 🌡️☀️\n3️⃣ Primeros auxilios y actuación ante emergencias 🚑\n4️⃣ Protección de datos, confidencialidad y seguridad informática 🔐💻\n5️⃣ Manipulación manual de cargas 📦👐\n6️⃣ Prevención de delitos penales, ética y conducta profesional 🕵️‍♂️⚖️\n7️⃣ Normas de higiene 🧼🧴\n8️⃣ Medidas de emergencia en Babyplant 🚨🌱\n9️⃣ Concienciación Plan LGTBI 🏳️‍🌈\n\n📲 Para facilitar la realización de estos cursos, hemos preparado un breve vídeo formativo 🎥 para cada uno. Junto con la documentación adicional 📚, explican de forma clara lo que debemos conocer.\n\n🙏🏼 Gracias por vuestra colaboración e implicación.",
             'items' => [
                 ['type' => 'link', 'title' => 'Plan de igualdad', 'url' => 'https://drive.google.com/file/d/1vGorPW6MZfPgUIyt6MIijjyLJSDU7aFv/view?usp=drive_link'],
