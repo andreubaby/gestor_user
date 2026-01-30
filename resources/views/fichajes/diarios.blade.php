@@ -187,7 +187,7 @@
         <div class="bg-white rounded-2xl ring-1 ring-emerald-100 p-4 shadow-sm">
             <div class="text-xs text-slate-500">En ausencia</div>
             <div class="text-2xl font-semibold text-amber-700">{{ $stats['en_ausencia'] ?? 0 }}</div>
-            <div class="mt-1 text-[11px] text-slate-500">Vacaciones / Permiso / Baja</div>
+            <div class="mt-1 text-[11px] text-slate-500">Vacaciones / Permiso / Baja / Libre</div>
         </div>
     </section>
 
@@ -227,11 +227,12 @@
                     $hasOut = !empty($salida);
 
                     // Ausencia
-                    $absence = $r->absence_tipo ?? null; // 'V'|'P'|'B'|null
+                    $absence = $r->absence_tipo ?? null; // 'V'|'P'|'B'|'L' null
                     $absenceLabel = match($absence) {
                         'V' => '🏖 Vacaciones',
                         'P' => '📝 Permiso',
                         'B' => '🏥 Baja',
+                        'L' => '🕒 Libre',
                         default => null,
                     };
 
