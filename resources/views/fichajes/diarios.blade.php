@@ -20,6 +20,24 @@
 
 <body class="min-h-screen bg-white text-slate-900">
 
+@php
+    $active = match (true) {
+        request()->routeIs('usuarios.*') => 'usuarios',
+        request()->routeIs('fichajes.*') || request()->routeIs('fichajes.diarios.*') => 'fichajes',
+        request()->routeIs('usuarios.onboarding.*') => 'onboarding',
+        request()->routeIs('gestor.gestoria') => 'dashboard',
+        request()->routeIs('rrhh.*') => 'rrhh',
+        request()->routeIs('groups.assign.*') => 'asignar',
+        request()->routeIs('tacografo.*') => 'tacografo',
+        default => '',
+    };
+
+    $tabBase = "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition
+                focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200";
+    $tabIdle = "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800";
+    $tabActive = "bg-emerald-600 text-white shadow";
+@endphp
+
 <div class="pointer-events-none fixed inset-0 overflow-hidden">
     <div class="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl"></div>
     <div class="absolute top-1/3 -right-40 h-[28rem] w-[28rem] rounded-full bg-green-200/30 blur-3xl"></div>
@@ -38,47 +56,135 @@
             </div>
         </div>
 
-        <nav class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('usuarios.index') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
-                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                Listado
-            </a>
+        {{-- NAV --}}
+        @php
+            // Base styles (ponlos donde ya los tengas, esto es por si lo pegas tal cual)
+            $tabBase = "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition
+                        focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200";
+            $tabIdle = "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800";
+            $tabActive = "bg-emerald-600 text-white shadow";
+        @endphp
 
-            <a href="{{ route('usuarios.vincular') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
-                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                Vincular
-            </a>
+        <nav class="flex items-center gap-3">
+            {{-- Tabs izquierda --}}
+            <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-1 shadow-sm">
 
-            <a href="{{ route('fichajes.diarios.index') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
-                Fichajes diarios
-            </a>
+                {{-- Listado --}}
+                <a href="{{ route('usuarios.index') }}"
+                   class="{{ $tabBase }} {{ $active==='usuarios' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='usuarios' ? 'bg-white/15' : 'bg-slate-100' }}">👤</span>
+                    Listado
+                </a>
 
-            <a href="{{ route('usuarios.onboarding.create') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
-                Onboarding
-            </a>
+                {{-- Fichajes --}}
+                <a href="{{ route('fichajes.diarios.index') }}"
+                   class="{{ $tabBase }} {{ $active==='fichajes' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='fichajes' ? 'bg-white/15' : 'bg-slate-100' }}">⏱️</span>
+                    Fichajes
+                </a>
 
-            <a href="{{ route('rrhh.documentos.index') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition">
-                RRHH
-            </a>
+                {{-- Onboarding --}}
+                <a href="{{ route('usuarios.onboarding.create') }}"
+                   class="{{ $tabBase }} {{ $active==='onboarding' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='onboarding' ? 'bg-white/15' : 'bg-slate-100' }}">🧾</span>
+                    Onboarding
+                </a>
 
-            <a href="{{ route('groups.assign.create') }}"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition
-                      focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                Asignar grupo
-            </a>
+                {{-- Dropdown Más --}}
+                <div class="relative group">
+                    <button type="button"
+                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? $tabActive : $tabIdle }}
+                           inline-flex items-center gap-2">
+                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
+                        Más
+                        <span class="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-slate-700 transition
+                             group-hover:bg-emerald-100 group-hover:text-emerald-800">
+                    <svg class="h-3.5 w-3.5 transition-transform group-hover:rotate-180 group-focus-within:rotate-180"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </span>
+                    </button>
 
-            <a href="#"
-               onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
-               class="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 transition
-                      focus:outline-none focus:ring-4 focus:ring-red-200">
-                Salir
-            </a>
+                    {{-- buffer para hover --}}
+                    <div class="absolute right-0 top-full h-2 w-56"></div>
+
+                    <div class="absolute right-0 mt-2 hidden w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5
+                        group-hover:block group-focus-within:block">
+                        <div class="p-2">
+
+                            {{-- Dashboard --}}
+                            <a href="{{ route('gestor.gestoria') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='dashboard' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">🏠</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Dashboard</div>
+                                    <div class="text-xs text-slate-500">Vista general</div>
+                                </div>
+                            </a>
+
+                            <div class="my-2 h-px bg-slate-100"></div>
+
+                            {{-- RRHH --}}
+                            <a href="{{ route('rrhh.documentos.index') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='rrhh' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-sky-50 ring-1 ring-sky-100">📁</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">RRHH</div>
+                                    <div class="text-xs text-slate-500">Documentos</div>
+                                </div>
+                            </a>
+
+                            {{-- Vincular --}}
+                            <a href="{{ route('usuarios.vincular') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='vincular' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">🔗</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Vincular</div>
+                                    <div class="text-xs text-slate-500">Unificar cuentas</div>
+                                </div>
+                            </a>
+
+                            {{-- Asignar grupo --}}
+                            <a href="{{ route('groups.assign.create') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='asignar' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-violet-50 ring-1 ring-violet-100">👥</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Asignar grupo</div>
+                                    <div class="text-xs text-slate-500">Gestión de grupos</div>
+                                </div>
+                            </a>
+
+                            {{-- Tacógrafo --}}
+                            <a href="{{ route('tacografo.index') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='tacografo' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-amber-50 ring-1 ring-amber-100">🚚</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Tacógrafo</div>
+                                    <div class="text-xs text-slate-500">Camión / Camionero</div>
+                                </div>
+                            </a>
+
+                            <div class="my-2 h-px bg-slate-100"></div>
+
+                            {{-- Logout en el dropdown (opcional) --}}
+                            <a href="#"
+                               onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-red-50 ring-1 ring-red-100">⎋</span>
+                                Cerrar sesión
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </nav>
+
     </div>
 </header>
 
