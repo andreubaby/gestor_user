@@ -16,6 +16,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\TrabajadorController;
 use App\Http\Controllers\UserPlutonController;
+use App\Http\Controllers\TacografoController;
 
 // 🔐 Redirige '/' directamente a /gestoria (modo admin)
 Route::redirect('/', '/gestoria');
@@ -134,6 +135,15 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
         ->name('rrhh.documentos.zip');
+
+    Route::resource('tacografo', TacografoController::class);
+    Route::post('/tacografo/{tacografo}/toggle-activo',
+        [TacografoController::class, 'toggleActivo']
+    )->name('tacografo.toggle');
+    Route::post('/tacografo/{tacografo}/fecha', [TacografoController::class, 'updateFecha'])
+        ->name('tacografo.updateFecha');
+    Route::get('/tacografo/create', [TacografoController::class, 'create'])->name('tacografo.create');
+    Route::post('/tacografo', [TacografoController::class, 'store'])->name('tacografo.store');
     // 🚪 Cerrar sesión
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
