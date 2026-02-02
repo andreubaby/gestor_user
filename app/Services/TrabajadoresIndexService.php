@@ -186,7 +186,7 @@ class TrabajadoresIndexService
         $items = $todos->forPage($page, $perPage)->values();
 
         // Bienestar (4 semanas) SOLO items de la página
-        $items = $this->bienestar->attachBienestarUltimasSemanas($items, 4);
+        $items = $this->bienestar->attachMoodUltimasSemanas($items, 4);
 
         // Ausencias SOLO items de la página
         $items = $this->ausencias->attachAusenciasPayload($items, $year);
