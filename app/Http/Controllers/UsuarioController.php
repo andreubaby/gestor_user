@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\DB;
 
 class UsuarioController extends Controller
 {
@@ -320,17 +321,13 @@ class UsuarioController extends Controller
 
     public function exportExcel(Request $request)
     {
-        // Reutiliza EXACTAMENTE los mismos filtros que el index (sin duplicar lógica)
         $search = $request->input('search');
         $activo = $request->input('activo');
         $sort   = $request->input('sort', 'nombre');
         $dir    = $request->input('dir', 'asc');
 
-        // Si quieres que sea idéntico a index: en lugar de rebuild, podrías extraer otro método en el service.
         $todos = $this->indexService->buildCollection($search);
 
-        // Aplicar filtros/sort igual que en index:
-        // (para no duplicar, lo ideal es exponer en el service métodos públicos apply..., pero aquí lo dejo simple)
         if ($activo !== null && $activo !== '') {
             $todos = $todos->filter(fn($r) => (int)($r->activo ?? 0) === (int)$activo)->values();
         }
@@ -351,8 +348,93 @@ class UsuarioController extends Controller
             };
         }, SORT_REGULAR, $dir === 'desc')->values();
 
-        $filename = 'trabajadores_polifonia_' . now()->format('Y_m_d_His') . '.xlsx';
+        // ===== AÑADIR ÚLTIMO FICHAJE usando usuarios_vinculados =====
+        $principalIds = $todos->map(fn($r) => $r->usuario_id ?? $r->id ?? $r->user_id ?? null)
+            ->filter()
+            ->unique()
+            ->values();
 
+        $uuids = $todos->pluck('uuid')->filter()->unique()->values();
+
+        if ($principalIds->isNotEmpty() || $uuids->isNotEmpty()) {
+
+            $vincQuery = DB::table('usuarios_vinculados')->select([
+                'usuario_id', 'uuid', 'user_fichaje_id', 'trabajador_id'
+            ]);
+
+            $vincQuery->where(function ($q) use ($principalIds, $uuids) {
+                if ($principalIds->isNotEmpty()) {
+                    $q->whereIn('usuario_id', $principalIds);
+                }
+                if ($uuids->isNotEmpty()) {
+                    $q->orWhereIn('uuid', $uuids);
+                }
+            });
+
+            $vincRows = $vincQuery->get();
+
+            // Mapas por ambas claves
+            $byUsuarioId = $vincRows->keyBy('usuario_id'); // [usuario_id => row]
+            $byUuid      = $vincRows->keyBy('uuid');       // [uuid => row]
+
+            // IDs destino para consultar en cada BD
+            $fichajesIds = $vincRows->pluck('user_fichaje_id')->filter()->unique()->values();
+            $trabIds     = $vincRows->pluck('trabajador_id')->filter()->unique()->values();
+
+            $lastPunchByFichajesUser = $fichajesIds->isNotEmpty()
+                ? DB::connection('mysql_fichajes')
+                    ->table('punches')
+                    ->whereIn('user_id', $fichajesIds)
+                    ->select('user_id', DB::raw('MAX(happened_at) as last_dt'))
+                    ->groupBy('user_id')
+                    ->pluck('last_dt', 'user_id')
+                : collect();
+
+            $lastFicharByTrabUser = $trabIds->isNotEmpty()
+                ? DB::connection('mysql_trabajadores')
+                    ->table('fichar')
+                    ->whereIn('user_id', $trabIds) // aquí user_id = trabajador_id (como me indicas)
+                    ->select('user_id', DB::raw('MAX(fecha_hora) as last_dt'))
+                    ->groupBy('user_id')
+                    ->pluck('last_dt', 'user_id')
+                : collect();
+
+            $todos = $todos->map(function ($r) use ($byUsuarioId, $byUuid, $lastPunchByFichajesUser, $lastFicharByTrabUser) {
+
+                $principalId = $r->usuario_id ?? $r->id ?? $r->user_id ?? null;
+                $uuid = $r->uuid ?? null;
+
+                $vinc = null;
+                if ($principalId !== null && isset($byUsuarioId[$principalId])) {
+                    $vinc = $byUsuarioId[$principalId];
+                } elseif ($uuid && isset($byUuid[$uuid])) {
+                    $vinc = $byUuid[$uuid];
+                }
+
+                $fichajesUserId = $vinc->user_fichaje_id ?? null;
+                $trabajadorId   = $vinc->trabajador_id ?? null;
+
+                $p = $fichajesUserId ? ($lastPunchByFichajesUser[$fichajesUserId] ?? null) : null;
+                $f = $trabajadorId   ? ($lastFicharByTrabUser[$trabajadorId] ?? null)      : null;
+
+                $pStr = $p ? (string)$p : null;
+                $fStr = $f ? (string)$f : null;
+
+                if ($pStr && $fStr) $r->ultimo_fichaje = ($pStr >= $fStr) ? $pStr : $fStr;
+                else $r->ultimo_fichaje = $pStr ?: $fStr;
+
+                return $r;
+            })->values();
+
+        } else {
+            $todos = $todos->map(function ($r) {
+                $r->ultimo_fichaje = null;
+                return $r;
+            })->values();
+        }
+        // ===== FIN ÚLTIMO FICHAJE =====
+
+        $filename = 'trabajadores_polifonia_' . now()->format('Y_m_d_His') . '.xlsx';
         return Excel::download(new TrabajadoresPolifoniaExport($todos), $filename);
     }
 
