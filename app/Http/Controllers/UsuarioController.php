@@ -331,9 +331,12 @@ class UsuarioController extends Controller
         if ($activo !== null && $activo !== '') {
             $todos = $todos->filter(fn($r) => (int)($r->activo ?? 0) === (int)$activo)->values();
         }
+
         if ($search) {
             $s = mb_strtolower($search);
-            $todos = $todos->filter(fn($r) => str_contains(mb_strtolower($r->nombre ?? ''), $s))->values();
+            $todos = $todos->filter(fn($r) =>
+            str_contains(mb_strtolower($r->nombre ?? ''), $s)
+            )->values();
         }
 
         $dir  = strtolower($dir) === 'desc' ? 'desc' : 'asc';
@@ -348,40 +351,37 @@ class UsuarioController extends Controller
             };
         }, SORT_REGULAR, $dir === 'desc')->values();
 
-        // ===== AÑADIR ÚLTIMO FICHAJE usando usuarios_vinculados =====
-        $principalIds = $todos->map(fn($r) => $r->usuario_id ?? $r->id ?? $r->user_id ?? null)
-            ->filter()
-            ->unique()
-            ->values();
+        // ===== ÚLTIMO FICHAJE (solo mysql_fichajes) =====
+
+        $principalIds = $todos->map(fn($r) =>
+            $r->usuario_id ?? $r->id ?? $r->user_id ?? null
+        )->filter()->unique()->values();
 
         $uuids = $todos->pluck('uuid')->filter()->unique()->values();
 
         if ($principalIds->isNotEmpty() || $uuids->isNotEmpty()) {
 
-            $vincQuery = DB::table('usuarios_vinculados')->select([
-                'usuario_id', 'uuid', 'user_fichaje_id', 'trabajador_id'
-            ]);
+            $vincRows = DB::table('usuarios_vinculados')
+                ->select('usuario_id', 'uuid', 'user_fichaje_id')
+                ->where(function ($q) use ($principalIds, $uuids) {
+                    if ($principalIds->isNotEmpty()) {
+                        $q->whereIn('usuario_id', $principalIds);
+                    }
+                    if ($uuids->isNotEmpty()) {
+                        $q->orWhereIn('uuid', $uuids);
+                    }
+                })
+                ->get();
 
-            $vincQuery->where(function ($q) use ($principalIds, $uuids) {
-                if ($principalIds->isNotEmpty()) {
-                    $q->whereIn('usuario_id', $principalIds);
-                }
-                if ($uuids->isNotEmpty()) {
-                    $q->orWhereIn('uuid', $uuids);
-                }
-            });
+            $byUsuarioId = $vincRows->keyBy('usuario_id');
+            $byUuid      = $vincRows->keyBy('uuid');
 
-            $vincRows = $vincQuery->get();
+            $fichajesIds = $vincRows->pluck('user_fichaje_id')
+                ->filter()
+                ->unique()
+                ->values();
 
-            // Mapas por ambas claves
-            $byUsuarioId = $vincRows->keyBy('usuario_id'); // [usuario_id => row]
-            $byUuid      = $vincRows->keyBy('uuid');       // [uuid => row]
-
-            // IDs destino para consultar en cada BD
-            $fichajesIds = $vincRows->pluck('user_fichaje_id')->filter()->unique()->values();
-            $trabIds     = $vincRows->pluck('trabajador_id')->filter()->unique()->values();
-
-            $lastPunchByFichajesUser = $fichajesIds->isNotEmpty()
+            $lastPunchByUser = $fichajesIds->isNotEmpty()
                 ? DB::connection('mysql_fichajes')
                     ->table('punches')
                     ->whereIn('user_id', $fichajesIds)
@@ -390,16 +390,7 @@ class UsuarioController extends Controller
                     ->pluck('last_dt', 'user_id')
                 : collect();
 
-            $lastFicharByTrabUser = $trabIds->isNotEmpty()
-                ? DB::connection('mysql_trabajadores')
-                    ->table('fichar')
-                    ->whereIn('user_id', $trabIds) // aquí user_id = trabajador_id (como me indicas)
-                    ->select('user_id', DB::raw('MAX(fecha_hora) as last_dt'))
-                    ->groupBy('user_id')
-                    ->pluck('last_dt', 'user_id')
-                : collect();
-
-            $todos = $todos->map(function ($r) use ($byUsuarioId, $byUuid, $lastPunchByFichajesUser, $lastFicharByTrabUser) {
+            $todos = $todos->map(function ($r) use ($byUsuarioId, $byUuid, $lastPunchByUser) {
 
                 $principalId = $r->usuario_id ?? $r->id ?? $r->user_id ?? null;
                 $uuid = $r->uuid ?? null;
@@ -412,16 +403,9 @@ class UsuarioController extends Controller
                 }
 
                 $fichajesUserId = $vinc->user_fichaje_id ?? null;
-                $trabajadorId   = $vinc->trabajador_id ?? null;
-
-                $p = $fichajesUserId ? ($lastPunchByFichajesUser[$fichajesUserId] ?? null) : null;
-                $f = $trabajadorId   ? ($lastFicharByTrabUser[$trabajadorId] ?? null)      : null;
-
-                $pStr = $p ? (string)$p : null;
-                $fStr = $f ? (string)$f : null;
-
-                if ($pStr && $fStr) $r->ultimo_fichaje = ($pStr >= $fStr) ? $pStr : $fStr;
-                else $r->ultimo_fichaje = $pStr ?: $fStr;
+                $r->ultimo_fichaje = $fichajesUserId
+                    ? ($lastPunchByUser[$fichajesUserId] ?? null)
+                    : null;
 
                 return $r;
             })->values();
@@ -432,11 +416,13 @@ class UsuarioController extends Controller
                 return $r;
             })->values();
         }
+
         // ===== FIN ÚLTIMO FICHAJE =====
 
         $filename = 'trabajadores_polifonia_' . now()->format('Y_m_d_His') . '.xlsx';
         return Excel::download(new TrabajadoresPolifoniaExport($todos), $filename);
     }
+
 
     public function showVinculacionManualConDatos($uuid)
     {
