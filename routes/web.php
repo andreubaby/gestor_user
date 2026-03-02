@@ -17,6 +17,7 @@ use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\TrabajadorController;
 use App\Http\Controllers\UserPlutonController;
 use App\Http\Controllers\TacografoController;
+use App\Http\Controllers\UserFichajeController;
 
 // 🔐 Redirige '/' directamente a /gestoria (modo admin)
 Route::redirect('/', '/gestoria');
@@ -135,6 +136,10 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
         ->name('rrhh.documentos.zip');
+
+    // 👤 CREAR usuario en BD de fichajes
+    Route::get('/fichajes/users/create', [UserFichajeController::class, 'create'])->name('fichajes.users.create');
+    Route::post('/fichajes/users', [UserFichajeController::class, 'store'])->name('fichajes.users.store');
 
     Route::resource('tacografo', TacografoController::class);
     Route::post('/tacografo/{tacografo}/toggle-activo',

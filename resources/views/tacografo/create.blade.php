@@ -116,6 +116,13 @@
                                 Tacógrafo
                             </a>
 
+                            <a href="{{ route('fichajes.users.create') }}"
+                               class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700
+                              hover:bg-emerald-50 hover:text-emerald-900 transition">
+                                <span class="h-2 w-2 rounded-full bg-teal-500/70"></span>
+                                Nuevo usuario fichajes
+                            </a>
+
                             <!-- En pequeño, Fichajes va aquí -->
                             <a href="{{ route('fichajes.diarios.index') }}"
                                class="lg:hidden flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700

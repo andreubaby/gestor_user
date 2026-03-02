@@ -169,6 +169,17 @@
                                 </div>
                             </a>
 
+                            {{-- Nuevo usuario fichajes --}}
+                            <a href="{{ route('fichajes.users.create') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                                      text-slate-700 hover:bg-emerald-50 hover:text-emerald-900">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-teal-50 ring-1 ring-teal-100">➕</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Nuevo usuario</div>
+                                    <div class="text-xs text-slate-500">BD de fichajes</div>
+                                </div>
+                            </a>
+
                             <div class="my-2 h-px bg-slate-100"></div>
 
                             {{-- Logout en el dropdown (opcional) --}}
@@ -314,6 +325,22 @@
                    class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white
                       hover:bg-slate-800 focus:ring-4 focus:ring-slate-300/40 transition">
                     Ir a Tacógrafo →
+                </a>
+            </div>
+
+            {{-- Nuevo usuario fichajes --}}
+            <div class="rounded-3xl border border-teal-200 bg-white p-6 shadow-sm hover:shadow-md transition">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">Nuevo usuario fichajes</h3>
+                        <p class="mt-2 text-sm text-slate-700">Crear usuario en la BD de fichajes.</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-teal-50 shadow ring-1 ring-teal-200">➕</span>
+                </div>
+                <a href="{{ route('fichajes.users.create') }}"
+                   class="mt-5 inline-flex items-center gap-2 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-900
+                      hover:bg-teal-100 focus:ring-4 focus:ring-teal-200 transition">
+                    Crear usuario →
                 </a>
             </div>
 
