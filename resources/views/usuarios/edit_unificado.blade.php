@@ -202,6 +202,17 @@
                                 </div>
                             </a>
 
+                            {{-- Nuevo usuario fichajes --}}
+                            <a href="{{ route('fichajes.users.create') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                                      text-slate-700 hover:bg-emerald-50 hover:text-emerald-900">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-teal-50 ring-1 ring-teal-100">➕</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Nuevo usuario</div>
+                                    <div class="text-xs text-slate-500">BD de fichajes</div>
+                                </div>
+                            </a>
+
                             <div class="my-2 h-px bg-slate-100"></div>
 
                             {{-- Logout en el dropdown (opcional) --}}
