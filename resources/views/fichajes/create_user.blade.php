@@ -171,202 +171,240 @@
 </header>
 
 {{-- Contenido principal --}}
-<main class="relative z-10 max-w-2xl mx-auto px-4 py-10">
+<main class="relative z-10 max-w-7xl mx-auto px-6 py-8">
 
     {{-- Breadcrumb --}}
-    <nav class="mb-6 flex items-center gap-2 text-sm text-slate-500">
+    <nav aria-label="Breadcrumb" class="mb-6 flex items-center gap-2 text-sm text-slate-500">
         <a href="{{ route('fichajes.diarios.index') }}" class="hover:text-emerald-700 transition">Fichajes</a>
         <span>/</span>
-        <span class="font-medium text-slate-800">Nuevo usuario</span>
+        <span class="font-medium text-slate-800">Gestión de usuarios</span>
     </nav>
 
-    {{-- Alerta de éxito --}}
+    {{-- Alertas globales --}}
     @if(session('success'))
         <div class="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
             <span class="mt-0.5 text-emerald-600 text-lg">✅</span>
             <p class="text-sm font-medium text-emerald-800">{{ session('success') }}</p>
         </div>
     @endif
-
-    {{-- Alerta de errores --}}
     @if($errors->any())
         <div class="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
             <span class="mt-0.5 text-red-500 text-lg">⚠️</span>
             <ul class="text-sm font-medium text-red-700 space-y-1">
-                @foreach($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
+                @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
             </ul>
         </div>
     @endif
 
-    {{-- Tarjeta del formulario --}}
-    <div class="rounded-3xl border border-slate-200 bg-white shadow-soft overflow-hidden">
+    {{-- Layout dos columnas --}}
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
 
-        {{-- Cabecera tarjeta --}}
-        <div class="bg-gradient-to-r from-emerald-50 to-white border-b border-slate-100 px-8 py-6">
-            <div class="flex items-center gap-4">
-                <span class="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-2xl ring-1 ring-emerald-200">⏱️</span>
-                <div>
-                    <h2 class="text-xl font-bold text-slate-900">Nuevo usuario de fichajes</h2>
-                    <p class="mt-0.5 text-sm text-slate-500">Crea un usuario directamente en la base de datos de fichajes.</p>
+        {{-- ── COLUMNA IZQUIERDA · Listado + buscador ── --}}
+        <div class="rounded-3xl border border-slate-200 bg-white shadow-soft overflow-hidden flex flex-col">
+
+            {{-- Cabecera --}}
+            <div class="bg-gradient-to-r from-teal-50 to-white border-b border-slate-100 px-6 py-5">
+                <div class="flex items-center gap-3">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-teal-100 text-xl ring-1 ring-teal-200">✏️</span>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Usuarios existentes</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Busca y edita cualquier usuario de la BD de fichajes.</p>
+                    </div>
                 </div>
+            </div>
+
+            {{-- Buscador --}}
+            <div class="px-6 pt-5 pb-3">
+                <div class="relative">
+                    <input type="text"
+                           id="userSearch"
+                           placeholder="Buscar por nombre o email…"
+                           oninput="filterUsers()"
+                           class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pl-10 text-sm
+                                  text-slate-900 shadow-sm placeholder:text-slate-400 transition
+                                  focus:border-teal-400 focus:outline-none focus:ring-4 focus:ring-teal-100">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                    </svg>
+                </div>
+            </div>
+
+            {{-- Lista scrollable —ocupa el espacio restante-- --}}
+            <div id="userList"
+                 class="mx-6 mb-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 overflow-y-auto"
+                 style="max-height: 420px;">
+                @forelse($existingUsers as $eu)
+                    <div class="user-row flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition"
+                         data-name="{{ strtolower($eu->name) }}"
+                         data-email="{{ strtolower($eu->email) }}">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-slate-800">{{ $eu->name }}</p>
+                            <p class="truncate text-xs text-slate-500">{{ $eu->email }}</p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <span class="hidden sm:inline-flex rounded-full px-2 py-0.5 text-xs font-medium
+                                @if($eu->work_mode === 'office') bg-sky-100 text-sky-700
+                                @elseif($eu->work_mode === 'intensive') bg-amber-100 text-amber-700
+                                @else bg-lime-100 text-lime-700 @endif">
+                                {{ $eu->work_mode }}
+                            </span>
+                            <a href="{{ route('fichajes.users.edit', $eu->id) }}"
+                               class="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold
+                                      text-white shadow-sm hover:bg-teal-700 active:scale-95 transition">
+                                ✏️ Editar
+                            </a>
+                        </div>
+                    </div>
+                @empty
+                    <p class="px-4 py-8 text-center text-sm text-slate-400">No hay usuarios en la BD de fichajes.</p>
+                @endforelse
+            </div>
+
+            {{-- Pie con contador --}}
+            <div class="border-t border-slate-100 px-6 py-3">
+                <p id="userCount" class="text-xs text-slate-400">
+                    {{ $existingUsers->count() }} usuario(s) en total
+                </p>
             </div>
         </div>
 
-        {{-- Formulario --}}
-        <form action="{{ route('fichajes.users.store') }}" method="POST" class="px-8 py-8 space-y-6">
-            @csrf
+        {{-- ── COLUMNA DERECHA · Formulario nuevo usuario ── --}}
+        <div class="rounded-3xl border border-slate-200 bg-white shadow-soft overflow-hidden">
 
-            {{-- Nombre --}}
-            <div>
-                <label for="name" class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Nombre completo <span class="text-red-500">*</span>
-                </label>
-                <input type="text"
-                       id="name"
-                       name="name"
-                       value="{{ old('name') }}"
-                       placeholder="Ej: María García López"
-                       autocomplete="name"
-                       required
-                       class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
-                              placeholder:text-slate-400 transition
-                              focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
-                              @error('name') border-red-400 bg-red-50 focus:ring-red-100 @enderror">
-                @error('name')
-                    <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            {{-- Email --}}
-            <div>
-                <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Correo electrónico <span class="text-red-500">*</span>
-                </label>
-                <input type="email"
-                       id="email"
-                       name="email"
-                       value="{{ old('email') }}"
-                       placeholder="usuario@ejemplo.com"
-                       autocomplete="email"
-                       required
-                       class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
-                              placeholder:text-slate-400 transition
-                              focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
-                              @error('email') border-red-400 bg-red-50 focus:ring-red-100 @enderror">
-                @error('email')
-                    <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            {{-- Modo de trabajo --}}
-            <div>
-                <label for="work_mode" class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Modo de trabajo <span class="text-red-500">*</span>
-                </label>
-                <select id="work_mode"
-                        name="work_mode"
-                        required
-                        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm transition
-                               focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
-                               @error('work_mode') border-red-400 bg-red-50 focus:ring-red-100 @enderror">
-                    <option value="" disabled {{ old('work_mode') ? '' : 'selected' }}>Selecciona un modo…</option>
-                    <option value="office"    {{ old('work_mode') === 'office'    ? 'selected' : '' }}>🏢 Office (oficina)</option>
-                    <option value="intensive" {{ old('work_mode') === 'intensive' ? 'selected' : '' }}>⚡ Intensive (jornada intensiva)</option>
-                    <option value="campaign"  {{ old('work_mode') === 'campaign'  ? 'selected' : '' }}>🌿 Campaign (campaña)</option>
-                </select>
-                @error('work_mode')
-                    <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            {{-- Contraseña --}}
-            <div>
-                <label for="password" class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Contraseña <span class="text-red-500">*</span>
-                </label>
-                <div class="relative">
-                    <input type="password"
-                           id="password"
-                           name="password"
-                           placeholder="Mínimo 8 caracteres"
-                           autocomplete="new-password"
-                           required
-                           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 shadow-sm
-                                  placeholder:text-slate-400 transition
-                                  focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
-                                  @error('password') border-red-400 bg-red-50 focus:ring-red-100 @enderror">
-                    <button type="button"
-                            onclick="togglePassword('password', this)"
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-                            title="Mostrar / ocultar contraseña">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
-                                     -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                    </button>
-                </div>
-                @error('password')
-                    <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
-            {{-- Confirmar contraseña --}}
-            <div>
-                <label for="password_confirmation" class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Confirmar contraseña <span class="text-red-500">*</span>
-                </label>
-                <div class="relative">
-                    <input type="password"
-                           id="password_confirmation"
-                           name="password_confirmation"
-                           placeholder="Repite la contraseña"
-                           autocomplete="new-password"
-                           required
-                           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-12 text-sm text-slate-900 shadow-sm
-                                  placeholder:text-slate-400 transition
-                                  focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100">
-                    <button type="button"
-                            onclick="togglePassword('password_confirmation', this)"
-                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-                            title="Mostrar / ocultar contraseña">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
-                                     -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                    </button>
+            {{-- Cabecera --}}
+            <div class="bg-gradient-to-r from-emerald-50 to-white border-b border-slate-100 px-6 py-5">
+                <div class="flex items-center gap-3">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-xl ring-1 ring-emerald-200">➕</span>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Nuevo usuario de fichajes</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Crea un usuario directamente en la base de datos de fichajes.</p>
+                    </div>
                 </div>
             </div>
 
-            {{-- Separador --}}
-            <div class="h-px bg-slate-100"></div>
+            {{-- Formulario --}}
+            <form action="{{ route('fichajes.users.store') }}" method="POST" class="px-6 py-6 space-y-5">
+                @csrf
 
-            {{-- Acciones --}}
-            <div class="flex items-center justify-between gap-3">
-                <a href="{{ route('fichajes.diarios.index') }}"
-                   class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm
-                          hover:bg-slate-50 transition">
-                    ← Volver
-                </a>
+                {{-- Nombre --}}
+                <div>
+                    <label for="name" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Nombre completo <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="name" name="name"
+                           value="{{ old('name') }}"
+                           placeholder="Ej: María García López"
+                           autocomplete="name" required
+                           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
+                                  placeholder:text-slate-400 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
+                                  @error('name') border-red-400 bg-red-50 @enderror">
+                    @error('name')<p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
 
-                <button type="submit"
-                        class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow
-                               hover:bg-emerald-700 active:scale-95 transition focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Crear usuario
-                </button>
-            </div>
-        </form>
-    </div>
+                {{-- Email --}}
+                <div>
+                    <label for="email" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Correo electrónico <span class="text-red-500">*</span>
+                    </label>
+                    <input type="email" id="email" name="email"
+                           value="{{ old('email') }}"
+                           placeholder="usuario@ejemplo.com"
+                           autocomplete="email" required
+                           class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm
+                                  placeholder:text-slate-400 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
+                                  @error('email') border-red-400 bg-red-50 @enderror">
+                    @error('email')<p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+
+                {{-- Modo de trabajo --}}
+                <div>
+                    <label for="work_mode" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        Modo de trabajo <span class="text-red-500">*</span>
+                    </label>
+                    <select id="work_mode" name="work_mode" required
+                            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm transition
+                                   focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
+                                   @error('work_mode') border-red-400 bg-red-50 @enderror">
+                        <option value="" disabled {{ old('work_mode') ? '' : 'selected' }}>Selecciona un modo…</option>
+                        <option value="office"    {{ old('work_mode') === 'office'    ? 'selected' : '' }}>🏢 Office</option>
+                        <option value="intensive" {{ old('work_mode') === 'intensive' ? 'selected' : '' }}>⚡ Intensive</option>
+                        <option value="campaign"  {{ old('work_mode') === 'campaign'  ? 'selected' : '' }}>🌿 Campaign</option>
+                    </select>
+                    @error('work_mode')<p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+
+                {{-- Contraseña + confirmación en grid --}}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="password" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                            Contraseña <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="password" id="password" name="password"
+                                   placeholder="Mín. 8 caracteres"
+                                   autocomplete="new-password" required
+                                   class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-900 shadow-sm
+                                          placeholder:text-slate-400 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100
+                                          @error('password') border-red-400 bg-red-50 @enderror">
+                            <button type="button" onclick="togglePassword('password', this)"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                                    title="Mostrar / ocultar">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        @error('password')<p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div>
+                        <label for="password_confirmation" class="block text-sm font-semibold text-slate-700 mb-1.5">
+                            Confirmar <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="password" id="password_confirmation" name="password_confirmation"
+                                   placeholder="Repite la contraseña"
+                                   autocomplete="new-password" required
+                                   class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-900 shadow-sm
+                                          placeholder:text-slate-400 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-100">
+                            <button type="button" onclick="togglePassword('password_confirmation', this)"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                                    title="Mostrar / ocultar">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Separador --}}
+                <div class="h-px bg-slate-100"></div>
+
+                {{-- Acciones --}}
+                <div class="flex items-center justify-between gap-3">
+                    <a href="{{ route('fichajes.diarios.index') }}"
+                       class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm
+                              font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition">
+                        ← Volver
+                    </a>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold
+                                   text-white shadow hover:bg-emerald-700 active:scale-95 transition focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Crear usuario
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>{{-- /grid --}}
 </main>
 
 <script>
@@ -378,6 +416,18 @@
         btn.title = isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña';
         btn.classList.toggle('text-emerald-600', isHidden);
         btn.classList.toggle('text-slate-400', !isHidden);
+    }
+
+    function filterUsers() {
+        const q = document.getElementById('userSearch').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#userList .user-row');
+        let visible = 0;
+        rows.forEach(row => {
+            const matches = row.dataset.name.includes(q) || row.dataset.email.includes(q);
+            row.style.display = matches ? '' : 'none';
+            if (matches) visible++;
+        });
+        document.getElementById('userCount').textContent = visible + ' usuario(s) encontrado(s)';
     }
 </script>
 
