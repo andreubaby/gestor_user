@@ -137,9 +137,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
         ->name('rrhh.documentos.zip');
 
-    // 👤 CREAR usuario en BD de fichajes
+    // 👤 CREAR / EDITAR usuario en BD de fichajes
     Route::get('/fichajes/users/create', [UserFichajeController::class, 'create'])->name('fichajes.users.create');
     Route::post('/fichajes/users', [UserFichajeController::class, 'store'])->name('fichajes.users.store');
+    Route::get('/fichajes/users/{id}/edit', [UserFichajeController::class, 'edit'])->name('fichajes.users.edit');
+    Route::put('/fichajes/users/{id}', [UserFichajeController::class, 'update'])->name('fichajes.users.update');
 
     Route::resource('tacografo', TacografoController::class);
     Route::post('/tacografo/{tacografo}/toggle-activo',
