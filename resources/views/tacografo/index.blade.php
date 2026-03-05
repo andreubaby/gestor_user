@@ -37,6 +37,13 @@
                 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200";
     $tabIdle = "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800";
     $tabActive = "bg-emerald-600 text-white shadow";
+
+    // Camiones con fecha expirada (> 3 meses desde hoy)
+    $limite3m = now()->subMonths(3);
+    $camionesExpirados = $tacografos->filter(fn($t) =>
+        $t->tipo === 'camion' && $t->fecha && $t->fecha->lt($limite3m)
+    );
+    $totalExpirados = $camionesExpirados->count();
 @endphp
 
 <!-- Fondo decorativo -->
@@ -221,6 +228,43 @@
         </div>
     @endif
 
+    {{-- Banner alerta camiones > 3 meses --}}
+    @if($totalExpirados > 0)
+        <div id="bannerExpirados"
+             class="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+            <div class="mt-0.5 grid h-10 w-10 flex-shrink-0 place-items-center rounded-2xl bg-amber-100 text-2xl">
+                ⚠️
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold text-amber-900">
+                    {{ $totalExpirados }} {{ $totalExpirados === 1 ? 'camión tiene' : 'camiones tienen' }}
+                    la fecha de tacógrafo desactualizada (más de 3 meses)
+                </p>
+                <ul class="mt-1.5 space-y-0.5">
+                    @foreach($camionesExpirados as $ce)
+                        <li class="text-xs text-amber-800">
+                            🚚 <span class="font-semibold">{{ $ce->valor }}</span>
+                            — último registro:
+                            <span class="font-semibold">
+                                {{ optional($ce->fecha)->format('d/m/Y') ?? 'Sin fecha' }}
+                            </span>
+                            <span class="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                                hace {{ optional($ce->fecha)->diffForHumans() }}
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            <button type="button"
+                    onclick="document.getElementById('bannerExpirados').remove()"
+                    class="mt-0.5 h-8 w-8 flex-shrink-0 grid place-items-center rounded-xl bg-amber-100 text-amber-700
+                           hover:bg-amber-200 transition text-sm font-bold"
+                    title="Cerrar aviso">
+                ✕
+            </button>
+        </div>
+    @endif
+
     {{-- Top bar --}}
     <section class="rounded-3xl border border-emerald-100 bg-white/80 backdrop-blur shadow-soft">
         <div class="p-5 md:p-6">
@@ -327,11 +371,13 @@
                         $tipoChip  = $t->tipo === 'camion'
                             ? 'bg-sky-50 text-sky-800 ring-sky-100'
                             : 'bg-violet-50 text-violet-800 ring-violet-100';
+                        $expirado  = $t->tipo === 'camion' && $t->fecha && $t->fecha->lt(now()->subMonths(3));
                     @endphp
 
-                    <tr class="hover:bg-emerald-50/40 transition"
+                    <tr class="hover:bg-emerald-50/40 transition {{ $expirado ? 'bg-amber-50/50' : '' }}"
                         data-row-id="{{ $t->id }}"
-                        data-tipo="{{ $t->tipo }}">
+                        data-tipo="{{ $t->tipo }}"
+                        data-expirado="{{ $expirado ? '1' : '0' }}">
 
                         <td class="px-6 py-4">
                         <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $tipoChip }}">
@@ -346,18 +392,25 @@
                         </td>
 
                         <td class="px-6 py-4 text-slate-700 tabular-nums">
-                            <button
-                                type="button"
-                                class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-800
-               hover:bg-emerald-50 hover:text-emerald-800 transition"
-                                data-open-fecha
-                                data-id="{{ $t->id }}"
-                                data-fecha="{{ optional($t->fecha)->format('Y-m-d') }}"
-                                data-tipo="{{ $t->tipo }}"
-                                data-valor="{{ $t->valor }}"
-                            >
-                                📅 <span data-fecha-text>{{ optional($t->fecha)->format('d/m/Y') }}</span>
-                            </button>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-xl {{ $expirado ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200' : 'bg-slate-100 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800' }} px-3 py-1.5 text-sm font-semibold transition"
+                                    data-open-fecha
+                                    data-id="{{ $t->id }}"
+                                    data-fecha="{{ optional($t->fecha)->format('Y-m-d') }}"
+                                    data-tipo="{{ $t->tipo }}"
+                                    data-valor="{{ $t->valor }}"
+                                >
+                                    📅 <span data-fecha-text>{{ optional($t->fecha)->format('d/m/Y') }}</span>
+                                </button>
+                                @if($expirado)
+                                    <span data-badge-expirado
+                                          class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                                        ⚠️ +3 meses
+                                    </span>
+                                @endif
+                            </div>
                         </td>
 
                         <td class="px-6 py-4 text-slate-600 max-w-[520px]">
@@ -593,9 +646,43 @@
                 }
                 currentBtn.dataset.fecha = data.fecha_iso;
 
-                // 2) Animación/feedback fila
+                // 2) Recalcular si la fecha nueva supera los 3 meses
                 const row = currentBtn.closest('tr');
+                const now3m = new Date();
+                now3m.setMonth(now3m.getMonth() - 3);
+                const nuevaFecha = data.fecha_iso ? new Date(data.fecha_iso) : null;
+                const sigueExpirado = nuevaFecha && nuevaFecha < now3m && currentBtn.dataset.tipo === 'camion';
+
                 if (row) {
+                    // Fondo fila
+                    row.dataset.expirado = sigueExpirado ? '1' : '0';
+                    row.classList.toggle('bg-amber-50/50', sigueExpirado);
+
+                    // Badge ⚠️ +3 meses
+                    const badgeContainer = currentBtn.parentElement;
+                    let badge = badgeContainer?.querySelector('[data-badge-expirado]');
+                    if (sigueExpirado && !badge && badgeContainer) {
+                        badge = document.createElement('span');
+                        badge.dataset.badgeExpirado = '';
+                        badge.className = 'inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200';
+                        badge.textContent = '⚠️ +3 meses';
+                        badgeContainer.appendChild(badge);
+                    } else if (!sigueExpirado && badge) {
+                        badge.remove();
+                    }
+
+                    // Color del botón de fecha
+                    if (sigueExpirado) {
+                        currentBtn.className = currentBtn.className
+                            .replace('bg-slate-100 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800', '')
+                            + ' bg-amber-100 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200';
+                    } else {
+                        currentBtn.className = currentBtn.className
+                            .replace('bg-amber-100 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200', '')
+                            + ' bg-slate-100 text-slate-800 hover:bg-emerald-50 hover:text-emerald-800';
+                    }
+
+                    // Animación/feedback fila
                     row.classList.add('ring-2','ring-emerald-300');
                     setTimeout(() => row.classList.remove('ring-2','ring-emerald-300'), 900);
                 }
