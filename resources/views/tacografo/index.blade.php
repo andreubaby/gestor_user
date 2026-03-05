@@ -249,7 +249,7 @@
                                 {{ optional($ce->fecha)->format('d/m/Y') ?? 'Sin fecha' }}
                             </span>
                             <span class="ml-1 rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                                hace {{ optional($ce->fecha)->diffForHumans() }}
+                                {{ optional($ce->fecha)->locale('es')->diffForHumans() }}
                             </span>
                         </li>
                     @endforeach
