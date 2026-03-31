@@ -10,7 +10,11 @@ class WorkerBuscadorController extends Controller
 {
     public function edit($id)
     {
-        $trabajador = WorkerBuscador::on('mysql_buscador')->findOrFail($id);
+        try {
+            $trabajador = WorkerBuscador::on('mysql_buscador')->findOrFail($id);
+        } catch (\Illuminate\Database\QueryException $e) {
+            abort(503, 'La tabla de trabajadores Buscador no está disponible: ' . $e->getMessage());
+        }
 
         return view('buscador.edit_worker', compact('trabajador'));
     }
@@ -23,7 +27,11 @@ class WorkerBuscadorController extends Controller
             'password' => 'nullable|min:4',
         ]);
 
-        $trabajador = WorkerBuscador::on('mysql_buscador')->findOrFail($id);
+        try {
+            $trabajador = WorkerBuscador::on('mysql_buscador')->findOrFail($id);
+        } catch (\Illuminate\Database\QueryException $e) {
+            abort(503, 'La tabla de trabajadores Buscador no está disponible: ' . $e->getMessage());
+        }
 
         $trabajador->name  = $request->name;
         $trabajador->email = $request->email;

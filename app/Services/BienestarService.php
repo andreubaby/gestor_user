@@ -2,53 +2,52 @@
 
 namespace App\Services;
 
-use App\Models\Fichar;         // fallback antiguo
-use App\Models\Punch;          // nuevo sistema (punches)
-use App\Models\UserFichaje;    // users en mysql_fichajes
-use App\Models\UserTrabajador; // users en sistema antiguo
+use App\Models\Fichar;
+use App\Models\Punch;
+use App\Models\UsuarioVinculado;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class BienestarService
 {
     /**
-     * Adjunta $weeks valores en $r->bienestar_ultimos (para no tocar la Blade):
-     * - Preferencia: Punch.mood (mysql_fichajes)
-     * - Fallback: Fichar.bienestar
+     * Adjunta $weeks valores de bienestar en $r->bienestar_ultimos.
      *
-     * Si prefieres cambiar el nombre a mood_ultimos en la Blade, dime y lo adapto.
+     * Resolución de IDs:
+     *  - Punch (nuevo sistema): trabajador_id → user_fichaje_id via UsuarioVinculado
+     *  - Fichar (fallback):     fichar.user_id = trabajador_id (Polifonía) directamente
      */
     public function attachMoodUltimasSemanas(Collection $items, int $weeks = 4): Collection
     {
-        $emails = $items
-            ->map(fn($r) => mb_strtolower(trim($r->email ?? '')))
+        $workerIds = $items
+            ->map(fn($r) => (int)($r->id ?? 0))
             ->filter()
             ->unique()
             ->values();
 
-        if ($emails->isEmpty()) {
+        if ($workerIds->isEmpty()) {
             return $items->map(function ($r) use ($weeks) {
                 $r->bienestar_ultimos = array_fill(0, $weeks, null);
                 return $r;
             });
         }
 
-        $moodByEmail = $this->moodUnificadoPorEmail($emails, $weeks);
+        $moodByWorkerId = $this->moodPorWorkerId($workerIds, $weeks);
 
-        return $items->map(function ($r) use ($moodByEmail, $weeks) {
-            $emailKey = mb_strtolower(trim($r->email ?? ''));
-            $r->bienestar_ultimos = $moodByEmail->get($emailKey, array_fill(0, $weeks, null));
+        return $items->map(function ($r) use ($moodByWorkerId, $weeks) {
+            $wid = (int)($r->id ?? 0);
+            $r->bienestar_ultimos = $moodByWorkerId->get($wid, array_fill(0, $weeks, null));
             return $r;
         });
     }
 
     /**
-     * Devuelve: [ email => [semana0, semana1, semana2, semana3] ]
-     * semana0 = semana actual (lunes-domingo)
+     * Devuelve: [ trabajador_id => [semana0, semana1, semana2, semana3] ]
+     * semana0 = semana actual, semana1 = hace 1 semana, etc.
      */
-    public function moodUnificadoPorEmail(Collection $emails, int $weeks = 4): Collection
+    public function moodPorWorkerId(Collection $workerIds, int $weeks = 4): Collection
     {
-        if ($emails->isEmpty()) return collect();
+        if ($workerIds->isEmpty()) return collect();
 
         $startOldestWeek = now()->startOfWeek(Carbon::MONDAY)->subWeeks($weeks - 1)->startOfDay();
         $endThisWeek     = now()->endOfWeek(Carbon::MONDAY)->endOfDay();
@@ -59,111 +58,94 @@ class BienestarService
 
         // =========================
         // A) NUEVO SISTEMA: Punch (mood, happened_at)
+        //    trabajador_id → user_fichaje_id via UsuarioVinculado
         // =========================
-        $usersNew = UserFichaje::query()
-            ->select(['id', 'email'])
-            ->whereIn('email', $emails->all())
-            ->get();
+        $vinculos = UsuarioVinculado::whereIn('trabajador_id', $workerIds->all())
+            ->whereNotNull('user_fichaje_id')
+            ->pluck('user_fichaje_id', 'trabajador_id')
+            ->map(fn($v) => (int)$v);
 
-        $newEmailToId = $usersNew->mapWithKeys(fn($u) => [
-            mb_strtolower(trim($u->email ?? '')) => (int) $u->id
-        ]);
-
-        $newUserIds = $usersNew->pluck('id')->map(fn($v) => (int)$v)->values()->all();
+        $fichajeUserIds = $vinculos->values()->filter()->unique()->values()->all();
 
         $punchAvgByUserWeek = collect();
 
-        if (!empty($newUserIds)) {
+        if (!empty($fichajeUserIds)) {
             $punches = Punch::query()
                 ->select(['user_id', 'mood', 'happened_at'])
-                ->whereIn('user_id', $newUserIds)
+                ->whereIn('user_id', $fichajeUserIds)
                 ->whereBetween('happened_at', [$startOldestWeek, $endThisWeek])
                 ->whereNotNull('mood')
                 ->get();
 
             $punchAvgByUserWeek = $punches
                 ->groupBy(function ($row) {
-                    $monday = Carbon::parse($row->happened_at)->startOfWeek(Carbon::MONDAY)->startOfDay();
+                    $monday = Carbon::parse($row->happened_at)
+                        ->startOfWeek(Carbon::MONDAY)
+                        ->startOfDay();
                     return (int)$row->user_id . '|' . $monday->format('Y-m-d');
                 })
                 ->map(fn($g) => $g->avg('mood'));
         }
 
         // =========================
-        // B) FALLBACK: Fichar (bienestar, created_at)
+        // B) FALLBACK: Fichar (bienestar, fecha_hora)
+        //    fichar.user_id = trabajador_id de Polifonía directamente
         // =========================
-        $usersOld = UserTrabajador::query()
-            ->select(['id', 'email'])
-            ->whereIn('email', $emails->all())
+        $ficharAvgByWorkerWeek = collect();
+
+        $fichajes = Fichar::query()
+            ->select(['user_id', 'bienestar', 'fecha_hora'])
+            ->whereIn('user_id', $workerIds->all())
+            ->whereBetween('fecha_hora', [$startOldestWeek, $endThisWeek])
+            ->whereNotNull('bienestar')
             ->get();
 
-        $oldEmailToId = $usersOld->mapWithKeys(fn($u) => [
-            mb_strtolower(trim($u->email ?? '')) => (int) $u->id
-        ]);
-
-        $oldUserIds = $usersOld->pluck('id')->map(fn($v) => (int)$v)->values()->all();
-
-        $ficharAvgByUserWeek = collect();
-
-        if (!empty($oldUserIds)) {
-            $fichajes = Fichar::query()
-                ->select(['user_id', 'bienestar', 'created_at'])
-                ->whereIn('user_id', $oldUserIds)
-                ->whereBetween('created_at', [$startOldestWeek, $endThisWeek])
-                ->whereNotNull('bienestar')
-                ->get();
-
-            $ficharAvgByUserWeek = $fichajes
+        if ($fichajes->isNotEmpty()) {
+            $ficharAvgByWorkerWeek = $fichajes
                 ->groupBy(function ($row) {
-                    $monday = Carbon::parse($row->created_at)->startOfWeek(Carbon::MONDAY)->startOfDay();
+                    $monday = Carbon::parse($row->fecha_hora)
+                        ->startOfWeek(Carbon::MONDAY)
+                        ->startOfDay();
                     return (int)$row->user_id . '|' . $monday->format('Y-m-d');
                 })
-                ->map(fn($g) => $g->avg('bienestar')); // bienestar como mood equivalente
+                ->map(fn($g) => $g->avg('bienestar'));
         }
 
         // =========================
-        // C) Resultado final por email (Punch primero, si no -> Fichar)
+        // C) Resultado final por trabajador_id (Punch primero, Fichar como fallback)
         // =========================
-        return $emails->mapWithKeys(function ($email) use (
+        return $workerIds->mapWithKeys(function ($workerId) use (
             $weekKeys,
-            $newEmailToId,
+            $vinculos,
             $punchAvgByUserWeek,
-            $oldEmailToId,
-            $ficharAvgByUserWeek
+            $ficharAvgByWorkerWeek
         ) {
-            $emailKey = mb_strtolower(trim($email));
-
-            $newId = $newEmailToId->get($emailKey);
-            $oldId = $oldEmailToId->get($emailKey);
+            $fichajeUserId = $vinculos->get($workerId);
 
             $vals = $weekKeys->map(function ($weekMonday) use (
-                $newId,
+                $workerId,
+                $fichajeUserId,
                 $punchAvgByUserWeek,
-                $oldId,
-                $ficharAvgByUserWeek
+                $ficharAvgByWorkerWeek
             ) {
-                // 1) Punch.mood
-                if ($newId) {
-                    $avg = $punchAvgByUserWeek->get($newId . '|' . $weekMonday);
+                // 1) Punch.mood (nuevo sistema, via UsuarioVinculado)
+                if ($fichajeUserId) {
+                    $avg = $punchAvgByUserWeek->get($fichajeUserId . '|' . $weekMonday);
                     if ($avg !== null) {
-                        $lvl = (int) round($avg);
-                        return max(1, min(4, $lvl));
+                        return max(1, min(4, (int) round($avg)));
                     }
                 }
 
-                // 2) Fallback Fichar.bienestar
-                if ($oldId) {
-                    $avg = $ficharAvgByUserWeek->get($oldId . '|' . $weekMonday);
-                    if ($avg !== null) {
-                        $lvl = (int) round($avg);
-                        return max(1, min(4, $lvl));
-                    }
+                // 2) Fallback Fichar.bienestar (sistema antiguo, user_id = trabajador_id)
+                $avg = $ficharAvgByWorkerWeek->get($workerId . '|' . $weekMonday);
+                if ($avg !== null) {
+                    return max(1, min(4, (int) round($avg)));
                 }
 
                 return null;
             })->values()->all();
 
-            return [$emailKey => $vals];
+            return [(int)$workerId => $vals];
         });
     }
 }

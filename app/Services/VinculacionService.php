@@ -45,8 +45,12 @@ class VinculacionService
             $id = $data[$c['key']] ?? null;
             if (empty($id)) continue;
 
-            $exists = DB::connection($c['conn'])->table($c['table'])->where('id', $id)->exists();
-            if (!$exists) $errors[$c['key']] = $c['msg'];
+            try {
+                $exists = DB::connection($c['conn'])->table($c['table'])->where('id', $id)->exists();
+                if (!$exists) $errors[$c['key']] = $c['msg'];
+            } catch (\Throwable $e) {
+                $errors[$c['key']] = $c['msg'] . ' (tabla no disponible)';
+            }
         }
 
         if (!empty($errors)) {

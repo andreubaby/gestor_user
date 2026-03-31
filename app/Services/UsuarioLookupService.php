@@ -77,12 +77,18 @@ class UsuarioLookupService
         $usuarioStore = $usuarioZeus = null;
 
         if (!empty($email)) {
-            $usuarioBuscador    = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $usuarioCronos      = UserCronos::on('mysql_cronos')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $usuarioSemillas    = UserSemillas::on('mysql_semillas')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $usuarioStore       = UserStore::on('mysql_store')->whereRaw('LOWER(email) = ?', [$email])->first();
-            $usuarioZeus        = UserZeus::on('mysql_zeus')->whereRaw('LOWER(email) = ?', [$email])->first();
+            $usuarioBuscador = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+
+            try {
+                $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+            } catch (\Throwable $e) {
+                // La tabla workers puede no existir en la BD remota buscador
+            }
+
+            $usuarioCronos  = UserCronos::on('mysql_cronos')->whereRaw('LOWER(email) = ?', [$email])->first();
+            $usuarioSemillas = UserSemillas::on('mysql_semillas')->whereRaw('LOWER(email) = ?', [$email])->first();
+            $usuarioStore   = UserStore::on('mysql_store')->whereRaw('LOWER(email) = ?', [$email])->first();
+            $usuarioZeus    = UserZeus::on('mysql_zeus')->whereRaw('LOWER(email) = ?', [$email])->first();
         }
 
         return compact(
