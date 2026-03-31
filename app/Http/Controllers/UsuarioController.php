@@ -105,9 +105,14 @@ class UsuarioController extends Controller
                 ? UserBuscador::on('mysql_buscador')->find($vinculo->user_buscador_id)
                 : null;
 
-            $trabajadorBuscador = !empty($vinculo->worker_buscador_id)
-                ? WorkerBuscador::on('mysql_buscador')->find($vinculo->worker_buscador_id)
-                : null;
+            $trabajadorBuscador = null;
+            if (!empty($vinculo->worker_buscador_id)) {
+                try {
+                    $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->find($vinculo->worker_buscador_id);
+                } catch (\Throwable $e) {
+                    Log::warning('[WorkerBuscador] Tabla no disponible (find by id): ' . $e->getMessage());
+                }
+            }
 
             $userCronos = !empty($vinculo->user_cronos_id)
                 ? UserCronos::on('mysql_cronos')->find($vinculo->user_cronos_id)
@@ -137,8 +142,13 @@ class UsuarioController extends Controller
             $usuarioPluton = $email ? UserPluton::whereRaw('LOWER(email) = ?', [$email])->first() : null;
 
             if ($email) {
-                $usuarioBuscador    = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
-                $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+                $usuarioBuscador = UserBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+
+                try {
+                    $trabajadorBuscador = WorkerBuscador::on('mysql_buscador')->whereRaw('LOWER(email) = ?', [$email])->first();
+                } catch (\Throwable $e) {
+                    Log::warning('[WorkerBuscador] Tabla no disponible (find by email): ' . $e->getMessage());
+                }
 
                 $userCronos   = UserCronos::on('mysql_cronos')->whereRaw('LOWER(email) = ?', [$email])->first();
                 $userSemillas = UserSemillas::on('mysql_semillas')->whereRaw('LOWER(email) = ?', [$email])->first();
