@@ -22,6 +22,15 @@ use App\Http\Controllers\UserFichajeController;
 // 🔐 Redirige '/' directamente a /gestoria (modo admin)
 Route::redirect('/', '/gestoria');
 
+// 📱 Maria App (TimeGuard Pro) — React/Vite SPA
+Route::get('/maria-app/{any?}', function () {
+    $indexPath = public_path('maria-app/index.html');
+    if (!file_exists($indexPath)) {
+        abort(404, 'Maria App no compilada. Ejecuta "npm run build" dentro de la carpeta "maria app".');
+    }
+    return response()->file($indexPath);
+})->where('any', '.*')->name('maria-app');
+
 // 🔐 Rutas para login (solo para invitados)
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [AuthController::class, 'showLoginForm'])->name('login');
