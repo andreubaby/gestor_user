@@ -141,18 +141,29 @@
                                 </div>
                             </a>
 
-                            {{-- Nuevo usuario fichajes --}}
-                            <a href="{{ route('fichajes.users.create') }}"
+                            {{-- Tacógrafo --}}
+                            <a href="{{ route('tacografo.index') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
-                                      {{ $active === 'fichajes_create' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-teal-50 ring-1 ring-teal-100">➕</span>
+                              {{ $active==='tacografo' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-amber-50 ring-1 ring-amber-100">🚚</span>
                                 <div class="leading-tight">
-                                    <div class="font-semibold">Nuevo usuario</div>
-                                    <div class="text-xs text-slate-500">BD de fichajes</div>
+                                    <div class="font-semibold">Tacógrafo</div>
+                                    <div class="text-xs text-slate-500">Camión / Camionero</div>
                                 </div>
                             </a>
 
-                            <div class="my-2 h-px bg-slate-100"></div>
+                            {{-- Maria App --}}
+                            <a href="{{ request()->getScheme() }}://{{ request()->getHost() }}:{{ parse_url(config('app.url'), PHP_URL_PORT) }}/maria-app"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
+                              {{ $active==='maria-app' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-pink-50 ring-1 ring-pink-100">🌸</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Maria App</div>
+                                    <div class="text-xs text-slate-500">Aplicación María</div>
+                                </div>
+                            </a>
+
+                            {{-- Nuevo usuario fichajes --}}
                             <a href="#"
                                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition">

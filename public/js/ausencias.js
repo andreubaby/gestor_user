@@ -1344,10 +1344,11 @@ function openFichajesModal(el) {
                                 ? labelFor(b)
                                 : (r.origen === 'daily' ? 'Daily' : 'Fichaje');
 
-                            const hora = r.hora || '—';
-                            const origen = r.origen || '—';
+                                            const hora = r.hora || '—';
+                                            const origen = r.origen || '—';
+                                            const punchId = r.punch_id ?? null;
 
-                            const minsVal = r?.meta?.worked_minutes;
+                                            const minsVal = r?.meta?.worked_minutes;
                             const mins = (r.origen === 'daily' && typeof minsVal !== 'undefined')
                                 ? ` · ${minsVal} min`
                                 : '';
@@ -1369,24 +1370,32 @@ function openFichajesModal(el) {
                                         ? `<span class="ml-2 inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-[11px] font-semibold">Salida</span>`
                                         : '';
 
-                            return `
-                              <div class="flex items-center justify-between gap-3 rounded-xl ring-1 ${cardClass} px-3 py-2">
-                                <div class="flex items-center gap-3">
-                                  <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ring-1 bg-white/70">
-                                    ${emoji}
-                                  </span>
-                                  <div class="leading-tight">
-                                    <div class="text-sm font-semibold text-gray-900">
-                                      ${label} ${badge}
-                                    </div>
-                                    <div class="text-xs text-gray-500">${dateKey} · ${hora} · ${origen}${mins}</div>
-                                  </div>
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                  ${b ? `Nivel ${b}` : ''}
-                                </div>
-                              </div>
-                            `;
+                                            return `
+                                              <div class="flex items-center justify-between gap-3 rounded-xl ring-1 ${cardClass} px-3 py-2"
+                                                   ${punchId ? `data-punch-id="${punchId}"` : ''}>
+                                                <div class="flex items-center gap-3">
+                                                  <span class="inline-flex items-center justify-center w-10 h-10 rounded-full ring-1 bg-white/70">
+                                                    ${emoji}
+                                                  </span>
+                                                  <div class="leading-tight">
+                                                    <div class="text-sm font-semibold text-gray-900">
+                                                      ${label} ${badge}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500">${dateKey} · ${hora} · ${origen}${mins}</div>
+                                                  </div>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                  <span class="text-xs text-gray-500">${b ? `Nivel ${b}` : ''}</span>
+                                                  ${punchId ? `
+                                                  <button type="button"
+                                                          onclick="event.stopPropagation(); deletePunch(${punchId}, this.closest('[data-punch-id]'))"
+                                                          class="ml-1 inline-flex items-center justify-center w-7 h-7 rounded-full text-red-400 hover:text-red-700 hover:bg-red-50 transition"
+                                                          title="Borrar fichaje">
+                                                    ✕
+                                                  </button>` : ''}
+                                                </div>
+                                              </div>
+                                            `;
                         }).join('')}
                             </div>
                           </li>
@@ -1414,6 +1423,57 @@ function closeFichajesModal() {
     const modal = document.getElementById('fichajesModal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+}
+
+async function deletePunch(punchId, cardEl) {
+    if (!punchId) return;
+    if (!confirm('¿Seguro que quieres borrar este fichaje?')) return;
+
+    const urlTemplate = window.APP?.routes?.destroyPunch || '';
+    if (!urlTemplate) { alert('Ruta de borrado no configurada.'); return; }
+
+    const url = urlTemplate.replace('__PUNCH_ID__', encodeURIComponent(punchId));
+
+    try {
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': window.APP.csrf,
+            },
+            credentials: 'same-origin',
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            console.error('[deletePunch] error', res.status, text.slice(0,200));
+            toastMsg('⚠️ Error al borrar el fichaje.');
+            return;
+        }
+
+        // Animar y quitar la tarjeta del DOM
+        if (cardEl) {
+            cardEl.style.transition = 'opacity 0.3s, transform 0.3s';
+            cardEl.style.opacity = '0';
+            cardEl.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                cardEl.remove();
+                // Si el grupo quedó vacío, quitar también el header del día
+                const parentGroup = document.querySelector('#fichajesList');
+                if (parentGroup) {
+                    parentGroup.querySelectorAll('li').forEach(li => {
+                        const cards = li.querySelectorAll('[data-punch-id]');
+                        if (cards.length === 0) li.remove();
+                    });
+                }
+            }, 300);
+        }
+
+        toastMsg('✅ Fichaje eliminado.');
+    } catch (e) {
+        console.error('[deletePunch] fetch error', e);
+        toastMsg('⚠️ Error de red al borrar.');
+    }
 }
 
 // cerrar al clicar fuera
