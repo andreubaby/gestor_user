@@ -5,12 +5,16 @@
     $trabajadorRouteId = $trabajador->id ?? ($trabajadorId ?? null);
 
     if (!$trabajadorRouteId) {
-        // si no hay trabajador, no podemos generar la URL de update
-        // (así evitas el "Missing required parameter")
         $trabajadorRouteId = null;
     }
 
     $wm = old('work_mode', $userFichaje->work_mode);
+
+    // Cargar los últimos 50 punches del usuario
+    $recentPunches = $userFichaje->punches()
+        ->orderByDesc('happened_at')
+        ->limit(50)
+        ->get();
 @endphp
 
 @if(!$trabajadorRouteId)
@@ -60,4 +64,56 @@
             </button>
         </div>
     </form>
+
+    {{-- ── Lista de fichajes recientes con opción de borrar ────────────────── --}}
+    <div class="mt-6">
+        <h4 class="text-sm font-semibold text-slate-700 mb-2">
+            Fichajes recientes
+            <span class="ml-1 text-xs font-normal text-slate-400">(últimos 50)</span>
+        </h4>
+
+        @if($recentPunches->isEmpty())
+            <p class="text-xs text-slate-400 italic">No hay fichajes registrados.</p>
+        @else
+            <div class="space-y-1 max-h-64 overflow-y-auto pr-1">
+                @foreach($recentPunches as $punch)
+                    @php
+                        $dt       = $punch->happened_at ? \Carbon\Carbon::parse($punch->happened_at) : null;
+                        $typeIcon = match(strtolower((string)($punch->type ?? ''))) {
+                            'in'  => '🟢',
+                            'out' => '🔴',
+                            default => '⚪',
+                        };
+                        $typeLabel = match(strtolower((string)($punch->type ?? ''))) {
+                            'in'  => 'Entrada',
+                            'out' => 'Salida',
+                            default => ucfirst($punch->type ?? '—'),
+                        };
+                    @endphp
+                    <div class="flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 bg-slate-50 ring-1 ring-slate-100 text-xs">
+                        <span class="font-mono text-slate-600 shrink-0">
+                            {{ $typeIcon }}
+                            {{ $dt ? $dt->format('d/m/Y H:i') : '—' }}
+                        </span>
+                        <span class="text-slate-500 shrink-0">{{ $typeLabel }}</span>
+                        @if($punch->note)
+                            <span class="text-slate-400 truncate max-w-[80px]" title="{{ $punch->note }}">{{ $punch->note }}</span>
+                        @endif
+                        <form method="POST"
+                              action="{{ route('fichajes.punches.destroy', ['punch' => $punch->id]) }}"
+                              onsubmit="return confirm('¿Seguro que quieres borrar este fichaje del {{ $dt ? $dt->format('d/m/Y H:i') : '' }}?');"
+                              class="shrink-0">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit"
+                                    class="text-red-500 hover:text-red-700 font-semibold leading-none px-1 py-0.5 rounded hover:bg-red-50 transition"
+                                    title="Eliminar fichaje">
+                                ✕
+                            </button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
 @endif

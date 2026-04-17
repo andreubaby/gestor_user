@@ -249,6 +249,7 @@ class FichajeController extends Controller
                 };
 
                 return [
+                    'punch_id'  => $p->id,
                     'origen'    => $origen,
                     'fecha'     => $dt?->format('Y-m-d'),
                     'hora'      => $dt?->format('H:i'),
@@ -289,6 +290,31 @@ class FichajeController extends Controller
             'ok'   => true,
             'data' => $rows,
         ]);
+    }
+
+    /**
+     * Elimina un punch (fichaje individual) de la BD de fichajes.
+     * Solo permite borrar punches del usuario vinculado al trabajador indicado.
+     */
+    public function destroyPunch(Request $r, int $punchId)
+    {
+        $punch = Punch::on('mysql_fichajes')->findOrFail($punchId);
+
+        // Guardamos info para el log antes de borrar
+        Log::info('[destroyPunch] Eliminando punch', [
+            'punch_id'    => $punch->id,
+            'user_id'     => $punch->user_id,
+            'happened_at' => $punch->happened_at,
+            'type'        => $punch->type,
+        ]);
+
+        $punch->delete();
+
+        if ($r->expectsJson()) {
+            return response()->json(['ok' => true, 'message' => 'Fichaje eliminado correctamente.']);
+        }
+
+        return back()->with('success', 'Fichaje eliminado correctamente.');
     }
 
 }

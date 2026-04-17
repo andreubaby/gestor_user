@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Punch;
 
 class UserFichaje extends Authenticatable
 {
@@ -47,5 +48,10 @@ class UserFichaje extends Authenticatable
     public function dailySummaries()
     {
         return $this->hasMany(Daily::class, 'user_id');
+    }
+
+    public function punches()
+    {
+        return $this->hasMany(Punch::class, 'user_id');
     }
 }

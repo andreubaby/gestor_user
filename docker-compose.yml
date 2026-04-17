@@ -74,10 +74,13 @@ services:
             sh -lc "
             echo 'El valor de APP_ENV es: ${APP_ENV}' &&
             npm install &&
+            cd '/var/www/html/maria app' && npm install && cd /var/www/html &&
             if [ '${APP_ENV}' = 'production' ]; then
-              npm run build;
+              npm run build &&
+              cd '/var/www/html/maria app' && npm run build && cd /var/www/html;
             else
-              npm run dev;
+              npm run dev &
+              cd '/var/www/html/maria app' && npm run build && cd /var/www/html && wait;
             fi
             "
         networks:
