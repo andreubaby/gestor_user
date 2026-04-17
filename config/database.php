@@ -73,6 +73,9 @@ return [
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
             'strict' => true,
+            'options' => [
+                \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+            ],
         ],
 
         'mysql_pluton' => [
@@ -160,10 +163,13 @@ return [
             'database' => env('DB10_DATABASE', 'trabajadores'),
             'username' => env('DB10_USERNAME', 'trabajadores'),
             'password' => env('DB10_PASSWORD', '1234'),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
+            'charset' => 'latin1',
+            'collation' => 'latin1_swedish_ci',
             'prefix' => '',
-            'strict' => true,
+            'strict' => false,
+            'options' => [
+                \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES latin1',
+            ],
         ],
 
         'mysql_fichajes' => [
@@ -177,6 +183,9 @@ return [
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
             'strict' => true,
+            'options' => [
+                \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+            ],
         ],
 
         'mariadb' => [

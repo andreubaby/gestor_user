@@ -100,6 +100,7 @@ Route::middleware('auth')->group(function () {
         ->name('usuarios.onboarding.send');
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
+    Route::delete('/fichajes/punches/{punch}', [FichajeController::class, 'destroyPunch'])->name('fichajes.punches.destroy');
 
     Route::get('/fichajes-diarios/export', [FichajesDiariosController::class, 'export'])
         ->name('fichajes.diarios.export');
