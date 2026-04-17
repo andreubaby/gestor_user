@@ -24,7 +24,8 @@ import {
   ChevronRight,
   Filter,
   AlertTriangle,
-  Download
+  Download,
+  ArrowLeft
 } from 'lucide-react';
 
 const WORKDAY_MINUTES = 480; // 8h
@@ -384,7 +385,15 @@ const App: React.FC = () => {
         </div>
       )}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <a
+            href={`${window.location.protocol}//${window.location.hostname}:${window.location.port || 80}/gestoria`}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all"
+            title="Volver al gestor"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Gestor
+          </a>
           <div className="bg-blue-900 p-2 rounded-xl shadow-lg shadow-blue-200"><Clock className="text-white w-6 h-6" /></div>
           <div>
             <h1 className="text-xl font-black text-slate-800 tracking-tight">TimeGuard Pro</h1>
