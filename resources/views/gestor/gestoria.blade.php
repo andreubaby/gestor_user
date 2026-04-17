@@ -170,7 +170,7 @@
                             </a>
 
                             {{-- Maria App --}}
-                            <a href="{{ request()->getScheme() }}://{{ request()->getHost() }}:{{ parse_url(config('app.url'), PHP_URL_PORT) }}/maria-app"
+                            <a href="/maria-app"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='maria-app' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
                                 <span class="grid h-8 w-8 place-items-center rounded-2xl bg-pink-50 ring-1 ring-pink-100">🌸</span>

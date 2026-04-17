@@ -116,7 +116,7 @@
                                 Tacógrafo
                             </a>
 
-                            <a href="{{ request()->getScheme() }}://{{ request()->getHost() }}:{{ parse_url(config('app.url'), PHP_URL_PORT) }}/maria-app"
+                            <a href="/maria-app"
                                class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700
                               hover:bg-emerald-50 hover:text-emerald-900 transition">
                                 <span class="h-2 w-2 rounded-full bg-pink-500/70"></span>
