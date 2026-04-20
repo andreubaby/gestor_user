@@ -59,12 +59,21 @@ class AusenciasService
         DB::connection('mysql_polifonia')->transaction(function () use ($trabajadorId, $data, $dates, $bucketYear, $tipo) {
 
             if ($data['mode'] === 'remove') {
-                DB::connection('mysql_polifonia')->table('trabajadores_dias')
+                $q = DB::connection('mysql_polifonia')->table('trabajadores_dias')
                     ->where('trabajador_id', $trabajadorId)
-                    ->where('tipo', $tipo)              // <-- usa $tipo
-                    ->where('vacation_year', $bucketYear)
-                    ->whereIn('fecha', $dates)
-                    ->delete();
+                    ->where('tipo', $tipo)
+                    ->whereIn('fecha', $dates);
+
+                // Para vacaciones filtramos también por vacation_year (puede haber el
+                // mismo día en años de devengo distintos). Para bajas/permisos/libres
+                // el día es único independientemente del vacation_year, así que NO
+                // filtramos por él para evitar que un vacation_year distinto al
+                // guardado impida el borrado.
+                if ($tipo === 'V') {
+                    $q->where('vacation_year', $bucketYear);
+                }
+
+                $q->delete();
                 return;
             }
 
