@@ -280,7 +280,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('rrhh.documentos.pdf') }}" class="space-y-4" id="rrhhForm">
+        <form method="POST" action="{{ route('rrhh.documentos.pdf', [], false) }}" class="space-y-4" id="rrhhForm">
             @csrf
 
             <!-- FORM (grid con más separación) -->
@@ -756,7 +756,7 @@
 
         const tmp = document.createElement('form');
         tmp.method = 'POST';
-        tmp.action = "{{ route('rrhh.documentos.zip') }}";
+        tmp.action = "{{ route('rrhh.documentos.zip', [], false) }}";
 
         const csrf = document.createElement('input');
         csrf.type = 'hidden';
