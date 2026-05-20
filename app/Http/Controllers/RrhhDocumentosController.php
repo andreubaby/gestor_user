@@ -267,13 +267,21 @@ class RrhhDocumentosController extends Controller
     // PDFTK helpers (AcroForm) with safe fallback
     // ------------------------------------------------------------
 
-    private function hasPdftk(): bool
+    private function resolvePdftkBinary(): ?string
     {
-        // 127 = command not found, así que comprobamos antes
-        $cmd = 'command -v pdftk >/dev/null 2>&1';
-        $code = null;
-        @exec($cmd, $out, $code);
-        return $code === 0;
+        foreach (['pdftk', 'pdftk-java'] as $binary) {
+            $cmd = sprintf('command -v %s 2>/dev/null', escapeshellarg($binary));
+            $output = [];
+            $code = null;
+            @exec($cmd, $output, $code);
+
+            $path = trim((string) ($output[0] ?? ''));
+            if ($code === 0 && $path !== '') {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     private function makeFdf(array $fields): string
@@ -297,11 +305,13 @@ class RrhhDocumentosController extends Controller
 
     private function fillPdfWithPdftk(string $templateAbs, array $fields, string $outAbs): void
     {
-        if (!$this->hasPdftk()) {
-            Log::warning('[RRHH DOCS] pdftk no está instalado. Se omite relleno.', [
+        $pdftkBinary = $this->resolvePdftkBinary();
+
+        if (!$pdftkBinary) {
+            Log::warning('[RRHH DOCS] pdftk/pdftk-java no está instalado. Se omite relleno.', [
                 'template' => $templateAbs,
             ]);
-            throw new \RuntimeException('pdftk no instalado');
+            throw new \RuntimeException('pdftk/pdftk-java no instalado');
         }
 
         $dir = dirname($outAbs);
@@ -314,7 +324,7 @@ class RrhhDocumentosController extends Controller
         file_put_contents($fdfPath, $fdf);
 
         $cmd = [
-            'pdftk',
+            $pdftkBinary,
             $templateAbs,
             'fill_form',
             $fdfPath,
