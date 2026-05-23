@@ -25,3 +25,14 @@ Route::delete('/timeguard/compensations/{id}', [TimeguardController::class, 'des
 // Bulk import desde localStorage
 Route::post('/timeguard/import', [TimeguardController::class, 'import']);
 
+// ─── OpenWA WhatsApp Webhooks ────────────────────────────────────────────────
+// Nota: Esta ruta NO requiere CSRF token ni autenticación
+Route::post('/webhooks/openwa', [\App\Http\Controllers\OpenWAWebhookController::class, 'handle'])
+    ->name('api.webhooks.openwa')
+    ->withoutMiddleware(['csrf']); // OpenWA webhook POST sin sesión
+
+// Alias legacy/singular para paneles que envían /api/webhook/openwa
+Route::post('/webhook/openwa', [\App\Http\Controllers\OpenWAWebhookController::class, 'handle'])
+    ->name('api.webhook.openwa')
+    ->withoutMiddleware(['csrf']);
+

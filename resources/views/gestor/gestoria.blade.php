@@ -89,12 +89,26 @@
                     Onboarding
                 </a>
 
+                {{-- OpenWA --}}
+                <a href="{{ route('openwa.collab.index') }}"
+                   class="{{ $tabBase }} {{ $active==='openwa' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='openwa' ? 'bg-white/15' : 'bg-slate-100' }}">💬</span>
+                    OpenWA
+                </a>
+
+                {{-- Automáticas --}}
+                <a href="{{ route('openwa.auto.index') }}"
+                   class="{{ $tabBase }} {{ $active==='openwa-automation' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='openwa-automation' ? 'bg-white/15' : 'bg-slate-100' }}">⚡</span>
+                    Automáticas
+                </a>
+
                 {{-- Dropdown Más --}}
                 <div class="relative group">
                     <button type="button"
-                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? $tabActive : $tabIdle }}
+                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo','openwa']) ? $tabActive : $tabIdle }}
                            inline-flex items-center gap-2">
-                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
+                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo','openwa']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
                         Más
                         <span class="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-slate-700 transition
                              group-hover:bg-emerald-100 group-hover:text-emerald-800">
@@ -191,6 +205,15 @@
                                 </div>
                             </a>
 
+                            <a href="{{ route('openwa.auto.index') }}"
+                               class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition text-slate-700 hover:bg-emerald-50 hover:text-emerald-900">
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">⚡</span>
+                                <div class="leading-tight">
+                                    <div class="font-semibold">Automáticas</div>
+                                    <div class="text-xs text-slate-500">Mensajes encadenados</div>
+                                </div>
+                            </a>
+
                             <div class="my-2 h-px bg-slate-100"></div>
 
                             {{-- Logout en el dropdown (opcional) --}}
@@ -272,6 +295,37 @@
                    class="mt-5 inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900
                       hover:bg-emerald-100 focus:ring-4 focus:ring-emerald-200 transition">
                     Ir a Onboarding →
+                </a>
+            </div>
+
+            {{-- OpenWA --}}
+            <div class="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm hover:shadow-md transition">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">OpenWA</h3>
+                        <p class="mt-2 text-sm text-slate-700">Centro de colaboraciones y envios WhatsApp.</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-lime-50 shadow ring-1 ring-lime-200">💬</span>
+                </div>
+                <a href="{{ route('openwa.collab.index') }}"
+                   class="mt-5 inline-flex items-center gap-2 rounded-2xl border border-lime-200 bg-lime-50 px-4 py-2 text-sm font-semibold text-lime-900
+                      hover:bg-lime-100 focus:ring-4 focus:ring-lime-200 transition">
+                    Ir a OpenWA →
+                </a>
+            </div>
+
+            {{-- Automáticas --}}
+            <div class="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm hover:shadow-md transition">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">Mensajes automáticos</h3>
+                        <p class="mt-2 text-sm text-slate-700">Cadenas de mensajes para personas y grupos.</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 shadow ring-1 ring-emerald-200">⚡</span>
+                </div>
+                <a href="{{ route('openwa.auto.index') }}"
+                   class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-200 transition">
+                    Crear secuencia →
                 </a>
             </div>
 
