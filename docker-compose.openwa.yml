@@ -1,0 +1,287 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOCKER-COMPOSE PARA INTEGRACIÓN OPENWA
+#
+# Este archivo de ejemplo muestra cómo ejecutar tanto Laravel como OpenWA
+# en contenedores Docker interconectados.
+#
+# OPCIONES:
+# 1. OpenWA como servicio de contenedor (recomendado para prod)
+# 2. OpenWA en host Windows (para desarrollo local)
+# 3. OpenWA en Linux (para desarrollo/staging)
+#
+# USO:
+#   docker-compose up -d
+#   docker-compose down
+#   docker-compose logs -f openwa
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ───────────────────────────────────────────────────────────────────────────
+  # LARAVEL APP
+  # ───────────────────────────────────────────────────────────────────────────
+  laravel:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: gestor-usuarios-app
+    restart: unless-stopped
+    working_dir: /app
+
+    environment:
+      # ─── Base del App ────────────────────────────────────────────────────
+      APP_NAME: "Gestor Usuarios"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY}
+      APP_URL: http://localhost:8000
+
+      # ─── Base de Datos ───────────────────────────────────────────────────
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # ─── Redis (opcional para caché/sessions) ────────────────────────────
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # ─── Queue (procesamiento de jobs) ───────────────────────────────────
+      QUEUE_CONNECTION: redis  # O 'database'
+
+      # ─── Logs ────────────────────────────────────────────────────────────
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+
+      # ────────────────────────────────────────────────────────────────────────
+      # ✨ OPENWA CONFIGURATION ✨
+      # ────────────────────────────────────────────────────────────────────────
+      #
+      # OPCIÓN 1: OpenWA en otro contenedor (recomendado)
+      # -> El servicio "openwa" debe estar en este mismo compose
+      # -> Laravel accede como: http://openwa:3000
+      #
+      OPENWA_BASE_URL: http://openwa:3000
+      OPENWA_API_KEY: ${OPENWA_API_KEY}
+      OPENWA_SESSION_ID: ${OPENWA_SESSION_ID:-default}
+      OPENWA_WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
+      OPENWA_REQUEST_TIMEOUT: 30000
+      OPENWA_DEFAULT_COUNTRY_CODE: 34
+
+      #
+      # OPCIÓN 2: OpenWA en host Windows/Linux (desarrollo)
+      # -> Descomentar siguiente línea
+      # -> Comentar línea anterior de OPENWA_BASE_URL
+      # -> OpenWA debe estar escuchando en localhost:3000
+      #
+      # OPENWA_BASE_URL: http://host.docker.internal:3000
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - .:/app
+      - /app/vendor
+      - /app/node_modules
+
+    networks:
+      - openwa-network
+
+    depends_on:
+      - mysql
+      - redis
+      - openwa
+
+    # Comando para ejecutar en desarrollo
+    command: >
+      sh -c "php artisan migrate --force &&
+             php artisan queue:work redis --memory=512 &
+             php artisan serve --host=0.0.0.0"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # OPENWA - WhatsApp Gateway
+  # ───────────────────────────────────────────────────────────────────────────
+  openwa:
+    image: open-wa/wa-automate:latest
+    # O si prefieres una versión específica:
+    # image: open-wa/wa-automate:3.0.4
+
+    container_name: openwa-gateway
+    restart: unless-stopped
+
+    environment:
+      # API Key para autenticar requests
+      API_KEY: ${OPENWA_API_KEY}
+
+      # Webhook URL que OpenWA usará para enviar eventos
+      # IMPORTANTE: debe ser accesible desde OpenWA
+      # En Docker: http://laravel:8000/api/webhooks/openwa
+      # En prod: https://tuapp.com/api/webhooks/openwa
+      WEBHOOK_URL: http://laravel:8000/api/webhooks/openwa
+      WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
+
+      # Más variables según tu setup de OpenWA
+      # Ver documentación: https://github.com/open-wa/wa-automate-nodejs
+
+      # Puerto donde escucha
+      PORT: 3000
+
+      # Ruta para guardar sesiones
+      SESSIONS_DIR: /root/.openwa/sessions
+
+      # Debug
+      LOG_LEVEL: info
+
+    ports:
+      - "3000:3000"  # API REST de OpenWA
+
+    volumes:
+      # Persistir sesiones (IMPORTANTE)
+      - openwa-sessions:/root/.openwa
+      # Logs
+      - openwa-logs:/root/.openwa/logs
+
+    networks:
+      - openwa-network
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # MySQL Database
+  # ───────────────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: gestor-usuarios-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    networks:
+      - openwa-network
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Redis - Cache & Queue
+  # ───────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gestor-usuarios-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis-data:/data
+
+    networks:
+      - openwa-network
+
+    command: redis-server --appendonly yes
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Nginx - Web Server (Opcional, si quieres reverse proxy)
+  # ───────────────────────────────────────────────────────────────────────────
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: gestor-usuarios-nginx
+  #   restart: unless-stopped
+  #
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #
+  #   volumes:
+  #     - ./docker/nginx/conf.d:/etc/nginx/conf.d
+  #     - ./docker/nginx/ssl:/etc/nginx/ssl
+  #     - .:/app
+  #
+  #   networks:
+  #     - openwa-network
+  #
+  #   depends_on:
+  #     - laravel
+
+networks:
+  openwa-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+  openwa-sessions:
+    driver: local
+  openwa-logs:
+    driver: local
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# INSTRUCCIONES DE USO
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 1. PREPARAR VARIABLES DE ENTORNO:
+#    cp .env.example .env
+#    # Editar .env con valores correctos
+#
+# 2. GENERAR APP_KEY:
+#    docker run --rm -v $(pwd):/app php:8.2-cli php /app/artisan key:generate
+#
+# 3. INICIAR CONTENEDORES:
+#    docker-compose up -d
+#
+# 4. EJECUTAR MIGRACIONES:
+#    docker-compose exec laravel php artisan migrate --force
+#
+# 5. VER LOGS:
+#    docker-compose logs -f laravel
+#    docker-compose logs -f openwa
+#    docker-compose logs -f mysql
+#
+# 6. CONECTAR A LA APP:
+#    http://localhost:8000
+#
+# 7. API DE OPENWA:
+#    http://localhost:3000
+#
+# 8. VERIFICAR QUE OPENWA ESTÁ LISTO:
+#    docker-compose exec openwa curl -H "X-API-Key: {OPENWA_API_KEY}" \
+#      http://localhost:3000/api/sessions/default
+#
+# 9. PROCESAR JOBS:
+#    docker-compose exec laravel php artisan queue:work redis
+#
+# 10. REGISTRAR WEBHOOK EN OPENWA:
+#     docker-compose exec laravel php artisan openwa:register-webhook
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+

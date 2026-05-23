@@ -5,6 +5,7 @@ use App\Http\Controllers\FichajesDiariosController;
 use App\Http\Controllers\GroupAssignmentController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\RrhhDocumentosController;
+use App\Http\Controllers\OpenWACollaborationController;
 use App\Http\Controllers\UserBuscadorController;
 use App\Http\Controllers\UserCronosController;
 use App\Http\Controllers\UserSemillasController;
@@ -18,9 +19,16 @@ use App\Http\Controllers\TrabajadorController;
 use App\Http\Controllers\UserPlutonController;
 use App\Http\Controllers\TacografoController;
 use App\Http\Controllers\UserFichajeController;
+use App\Http\Controllers\AutomationSequenceController;
+use App\Http\Controllers\MissingPunchReminderController;
 
 // 🔐 Redirige '/' directamente a /gestoria (modo admin)
 Route::redirect('/', '/gestoria');
+
+// 📎 Adjuntos de automatización (público para que OpenWA pueda descargar)
+Route::get('/automation/attachments/{filename}', [AutomationSequenceController::class, 'serveAttachment'])
+    ->where('filename', '[A-Za-z0-9\-]+\.[A-Za-z0-9]+')
+    ->name('automation.attachments.show');
 
 // 📱 Maria App (TimeGuard Pro) — React/Vite SPA
 Route::get('/maria-app/{any?}', function () {
@@ -98,6 +106,31 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/usuarios/onboarding/send', [OnboardingController::class, 'onboardingSend'])
         ->name('usuarios.onboarding.send');
+
+    // OpenWA - vista de colaboraciones
+    Route::get('/openwa/colaboraciones', [OpenWACollaborationController::class, 'index'])
+        ->name('openwa.collab.index');
+    Route::get('/openwa/automatizaciones', [OpenWACollaborationController::class, 'automaticMessages'])
+        ->name('openwa.auto.index');
+    Route::get('/openwa/colaboraciones/diagnostics', [OpenWACollaborationController::class, 'diagnostics'])
+        ->name('openwa.collab.diagnostics');
+    Route::get('/openwa/colaboraciones/recent-messages', [OpenWACollaborationController::class, 'recentMessagesPartial'])
+        ->name('openwa.collab.recent-messages');
+    Route::get('/openwa/api/search-trabajadores', [OpenWACollaborationController::class, 'searchTrabajadores'])
+        ->name('openwa.collab.search-trabajadores');
+    Route::post('/openwa/colaboraciones/send-trabajador', [OpenWACollaborationController::class, 'sendFromTrabajador'])
+        ->name('openwa.collab.send.user');
+    Route::post('/openwa/colaboraciones/send-grupo', [OpenWACollaborationController::class, 'sendToGroup'])
+        ->name('openwa.collab.send.group');
+    Route::post('/openwa/colaboraciones/send-grupo-openwa', [OpenWACollaborationController::class, 'sendToOpenwaGroup'])
+        ->name('openwa.collab.send.group.openwa');
+    Route::post('/openwa/colaboraciones/send-phone', [OpenWACollaborationController::class, 'sendFromPhone'])
+        ->name('openwa.collab.send.phone');
+    Route::post('/openwa/colaboraciones/create-group', [OpenWACollaborationController::class, 'createGroup'])
+        ->name('openwa.collab.create.group');
+    Route::post('/openwa/automatizaciones/enviar', [OpenWACollaborationController::class, 'sendAutomaticMessages'])
+        ->name('openwa.auto.send');
+
     // opcional modal historial
     Route::get('/fichajes/{trabajador}/historial', [FichajeController::class, 'getFichajes'])->name('fichajes.historial');
     Route::delete('/fichajes/punches/{punch}', [FichajeController::class, 'destroyPunch'])->name('fichajes.punches.destroy');
@@ -161,6 +194,37 @@ Route::middleware('auth')->group(function () {
         ->name('tacografo.updateFecha');
     Route::get('/tacografo/create', [TacografoController::class, 'create'])->name('tacografo.create');
     Route::post('/tacografo', [TacografoController::class, 'store'])->name('tacografo.store');
+
+    // 🤖 AUTOMATIZACIONES
+    Route::prefix('automation')->name('automation.')->group(function () {
+        Route::get('/missing-punch/preview', [MissingPunchReminderController::class, 'index'])->name('missing-punch.preview');
+        Route::resource('sequences', AutomationSequenceController::class)->names([
+            'index' => 'sequences.index',
+            'create' => 'sequences.create',
+            'store' => 'sequences.store',
+            'show' => 'sequences.show',
+            'edit' => 'sequences.edit',
+            'update' => 'sequences.update',
+            'destroy' => 'sequences.destroy',
+        ]);
+        Route::post('/api/upload-attachment', [AutomationSequenceController::class, 'uploadAttachment'])->name('api.upload-attachment');
+        Route::get('/attachments/private/{filename}', [AutomationSequenceController::class, 'serveAttachment'])->name('attachments.show.private');
+        Route::get('/api/search-trabajadores', [AutomationSequenceController::class, 'searchTrabajadores'])->name('api.search-trabajadores');
+        Route::get('/api/sequences-live-status', [AutomationSequenceController::class, 'liveStatus'])->name('api.sequences-live-status');
+        Route::post('/sequences/{sequence}/execute', [AutomationSequenceController::class, 'execute'])->name('sequences.execute');
+        Route::post('/sequences/{sequence}/toggle-status', [AutomationSequenceController::class, 'toggleStatus'])->name('sequences.toggleStatus');
+        Route::post('/sequences/{sequence}/duplicate', [AutomationSequenceController::class, 'duplicate'])->name('sequences.duplicate');
+        Route::post('/sequences/{sequence}/save-template', [AutomationSequenceController::class, 'saveAsTemplate'])->name('sequences.saveTemplate');
+        Route::post('/sequences/{sequence}/create-from-template', [AutomationSequenceController::class, 'createFromTemplate'])->name('sequences.createFromTemplate');
+        Route::get('/sequences/{sequence}/schedule/create', [AutomationSequenceController::class, 'createSchedule'])->name('sequences.createSchedule');
+        Route::post('/sequences/{sequence}/schedule', [AutomationSequenceController::class, 'storeSchedule'])->name('sequences.storeSchedule');
+        Route::get('/sequences/{sequence}/schedule/{schedule}/edit', [AutomationSequenceController::class, 'editSchedule'])->name('sequences.editSchedule');
+        Route::put('/sequences/{sequence}/schedule/{schedule}', [AutomationSequenceController::class, 'updateSchedule'])->name('sequences.updateSchedule');
+        Route::delete('/sequences/{sequence}/schedule/{schedule}', [AutomationSequenceController::class, 'destroySchedule'])->name('sequences.destroySchedule');
+        Route::get('/audit', [AutomationSequenceController::class, 'audit'])->name('audit.index');
+        Route::get('/audit/export-csv', [AutomationSequenceController::class, 'exportAuditCsv'])->name('audit.exportCsv');
+    });
+
     // 🚪 Cerrar sesión
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
