@@ -11,5 +11,5 @@ class TrabajadorPolifonia extends Model
     protected $primaryKey = 'id';              // si tu PK es diferente, cámbialo
     public $timestamps = false;                // si no tienes created_at/updated_at
 
-    protected $fillable = ['id','nombre', 'email','nif','empresa']; // ajusta según tus campos reales
+    protected $fillable = ['id','nombre', 'email','tfno','nif','empresa']; // ajusta según tus campos reales
 }
