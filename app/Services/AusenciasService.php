@@ -203,7 +203,7 @@ class AusenciasService
             }
 
             // ✅ Transformaciones
-            $dias = $this->extendConsecutivosPosteriores($trabajadorId, $tipo, $diasBase);
+            $dias = $this->extendConsecutivosPosteriores($trabajadorId, $tipo, $diasBase, $vacationYear);
             $rangos = $this->toRangos($dias);
 
             Log::info('[PDF STREAM] rangos built', [
@@ -266,13 +266,14 @@ class AusenciasService
         }
     }
 
-    private function extendConsecutivosPosteriores(int $trabajadorId, string $tipo, Collection $diasBase): Collection
+    private function extendConsecutivosPosteriores(int $trabajadorId, string $tipo, Collection $diasBase, ?int $vacationYear = null): Collection
     {
         $last = Carbon::parse($diasBase->last())->startOfDay();
 
         $spill = TrabajadorDia::query()
             ->where('trabajador_id', $trabajadorId)
             ->where('tipo', $tipo)
+            ->when($vacationYear !== null, fn($q) => $q->where('vacation_year', $vacationYear))
             ->where('fecha', '>', $last->format('Y-m-d'))
             ->where('fecha', '<=', $last->copy()->addDays(31)->format('Y-m-d'))
             ->orderBy('fecha')
