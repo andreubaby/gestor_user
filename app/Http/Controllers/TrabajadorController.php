@@ -31,17 +31,28 @@ class TrabajadorController extends Controller
         $trabajador = TrabajadorPolifonia::on('mysql_polifonia')->findOrFail($id);
 
         $request->validate([
+            'nombre'   => ['nullable', 'string', 'max:255'],
             'email'    => ['required', 'email'],
+            'nif'      => ['nullable', 'string', 'max:20'],
+            'tfno'     => ['nullable', 'string', 'max:30'],
+            'empresa'  => ['nullable', 'string', 'in:Babyplant S.L.,Babyplant Spain S.L.,Perijena,'],
             'password' => ['nullable', 'string', 'min:12'],
-            // Si tu form tiene password_confirmation, puedes activar esto:
-            // 'password' => ['nullable','string','min:12','confirmed'],
         ]);
 
         $oldEmail = mb_strtolower(trim((string) $trabajador->email));
         $newEmail = mb_strtolower(trim((string) $request->email));
 
-        // 2) Actualizamos email en Polifonía
-        $trabajador->email = $newEmail;
+        // 2) Actualizamos campos en Polifonía
+        $trabajador->email  = $newEmail;
+        $trabajador->nombre = $request->nombre ?? $trabajador->nombre;
+        $trabajador->nif    = $request->nif    ?? $trabajador->nif;
+        $trabajador->tfno   = $request->tfno   ?? $trabajador->tfno;
+
+        // Empresa: permitimos vaciar si se elige "Sin empresa"
+        if ($request->has('empresa')) {
+            $trabajador->empresa = $request->empresa ?: null;
+        }
+
         $trabajador->save();
 
         // 3) Si hay usuario en la BD de "trabajadores", lo actualizamos también
@@ -59,12 +70,20 @@ class TrabajadorController extends Controller
             $user->save();
         }
 
+        $msg = $user
+            ? 'Trabajador actualizado (Polifonía + Usuario).'
+            : 'Trabajador actualizado en Polifonía.';
+
+        // 4) Si venimos del editor unificado, volvemos a él
+        if ($request->filled('redirect_uuid')) {
+            return redirect()
+                ->route('usuarios.edit.uuid', ['uuid' => $request->redirect_uuid])
+                ->with('success', $msg);
+        }
+
         return redirect()
             ->route('usuarios.index')
-            ->with('success', $user
-                ? 'Trabajador actualizado (Polifonía + Usuario).'
-                : 'Trabajador actualizado en Polifonía (no existía usuario en la BD de trabajadores).'
-            );
+            ->with('success', $msg);
     }
 
     public function toggleActivo(Request $request, $id)
