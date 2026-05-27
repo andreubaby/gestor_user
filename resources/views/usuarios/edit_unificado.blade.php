@@ -258,7 +258,10 @@
         $items[] = [
             'label' => 'Aplicación Polifonía',
             'color' => 'polifonia',
-            'html'  => view('partials.form_trabajador', ['trabajador' => $trabajador])->render(),
+            'html'  => view('partials.form_trabajador', [
+                'trabajador' => $trabajador,
+                'vinculo'    => $vinculo ?? null,
+            ])->render(),
         ];
     }
 
