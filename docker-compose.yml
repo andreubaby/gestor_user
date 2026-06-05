@@ -52,6 +52,7 @@ services:
             context: .
             dockerfile: docker/php/Dockerfile
         container_name: queue_gestor
+        user: "33:33"
         restart: always
         working_dir: /var/www/html
         depends_on:
@@ -82,6 +83,7 @@ services:
             context: .
             dockerfile: docker/php/Dockerfile
         container_name: scheduler_gestor
+        user: "33:33"
         restart: always
         working_dir: /var/www/html
         depends_on:
@@ -134,10 +136,13 @@ services:
             cd '/var/www/html/maria app' && npm install && cd /var/www/html &&
             if [ '${APP_ENV}' = 'production' ]; then
               npm run build &&
-              cd '/var/www/html/maria app' && npm run build && cd /var/www/html;
+                            rm -f public/hot &&
+                            cd '/var/www/html/maria app' && npm run build && cd /var/www/html;
             else
-              npm run dev &
-              cd '/var/www/html/maria app' && npm run build && cd /var/www/html && wait;
+                            npm run build &&
+                            rm -f public/hot &&
+                            cd '/var/www/html/maria app' && npm run build && cd /var/www/html &&
+                            tail -f /dev/null;
             fi
             "
         networks:

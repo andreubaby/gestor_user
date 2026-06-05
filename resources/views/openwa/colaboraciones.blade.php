@@ -359,7 +359,8 @@
                             </div>
                             <div class="flex items-start justify-between rounded-lg bg-slate-50 p-3">
                                 <span class="text-sm font-medium text-slate-600">Conectado</span>
-                                <span class="text-sm font-medium text-slate-900">{{ $session['connectedAt'] ? \Carbon\Carbon::parse($session['connectedAt'])->diffForHumans() : 'N/A' }}</span>
+                                @php($connectedAt = data_get($session, 'connectedAt') ?? data_get($session, 'connected_at'))
+                                <span class="text-sm font-medium text-slate-900">{{ $connectedAt ? \Carbon\Carbon::parse($connectedAt)->diffForHumans() : 'N/A' }}</span>
                             </div>
                         </div>
                     @endif
@@ -434,8 +435,12 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <p class="font-semibold text-amber-700">Pendientes</p>
+                            <p class="font-semibold text-amber-700">Jobs en cola</p>
                             <p class="mt-1 text-lg font-bold text-amber-800" x-text="diagnostics.jobs_pending"></p>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                            <p class="font-semibold text-blue-700">Mensajes pending</p>
+                            <p class="mt-1 text-lg font-bold text-blue-800" x-text="diagnostics.messages_pending ?? 0"></p>
                         </div>
                         <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                             <p class="font-semibold text-rose-700">Fallidos</p>

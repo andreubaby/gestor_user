@@ -72,13 +72,15 @@ class OpenWACollaborationController extends Controller
             ->orWhere('email', 'like', "%{$query}%")
             ->limit(10)
             ->get(['id', 'nombre', 'tfno', 'email'])
-            ->map(fn($t) => [
-                'id' => $t->id,
-                'label' => "{$t->nombre} ({$t->tfno})",
-                'tfno' => $t->tfno,
-                'nombre' => $t->nombre,
-                'email' => $t->email,
-            ]);
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'label' => "{$t->nombre} ({$t->tfno})",
+                    'tfno' => $t->tfno,
+                    'nombre' => $t->nombre,
+                    'email' => $t->email,
+                ];
+            });
 
         return response()->json($trabajadores);
     }
@@ -251,7 +253,9 @@ class OpenWACollaborationController extends Controller
                             'member_count' => isset($group['size']) ? (int) $group['size'] : null,
                         ];
                     })
-                    ->filter(fn ($group) => $group['chat_id'] !== '');
+                    ->filter(function ($group) {
+                        return $group['chat_id'] !== '';
+                    });
             } catch (\Throwable $e) {
                 $sessionGroupsError = $e->getMessage();
                 Log::warning('OpenWA groups unavailable for collaboration dashboard', [
@@ -284,15 +288,25 @@ class OpenWACollaborationController extends Controller
 
     protected function getDiagnostics(): array
     {
-        $pending = 0;
+        $queueJobsPending = 0;
+        $messagesPending = 0;
         $failed = 0;
         $workerActive = false;
         $workerHeartbeatAge = null;
 
         try {
-            $pending = (int) DB::table('jobs')->count();
+            $queueJobsPending = (int) DB::table('jobs')->count();
         } catch (\Throwable $e) {
             // Si la tabla jobs no existe en algún entorno, mantenemos 0.
+        }
+
+        try {
+            $messagesPending = (int) WhatsappMessage::query()
+                ->outbound()
+                ->where('status', 'pending')
+                ->count();
+        } catch (\Throwable $e) {
+            // Si la tabla whatsapp_messages no está disponible, mantenemos 0.
         }
 
         try {
@@ -319,7 +333,8 @@ class OpenWACollaborationController extends Controller
         return [
             'session_id' => (string) config('openwa.session_id', 'default'),
             'webhook_url' => route('api.webhooks.openwa'),
-            'jobs_pending' => $pending,
+            'jobs_pending' => $queueJobsPending,
+            'messages_pending' => $messagesPending,
             'jobs_failed' => $failed,
             'worker_active' => $workerActive,
             'worker_heartbeat_age' => $workerHeartbeatAge,

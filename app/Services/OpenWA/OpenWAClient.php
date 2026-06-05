@@ -187,11 +187,19 @@ class OpenWAClient
     public function getSession(): array
     {
         try {
-            return $this->requestToSessionEndpoint(
+            $response = $this->requestToSessionEndpoint(
                 operation: 'getSession',
                 method: 'GET',
                 path: ''
             );
+
+            // Algunos gateways OpenWA devuelven una lista de sesiones incluso al consultar una sesión.
+            // En ese caso usamos la primera para mantener compatibilidad con el resto del dashboard.
+            if (array_is_list($response) && isset($response[0]) && is_array($response[0])) {
+                return $response[0];
+            }
+
+            return $response;
         } catch (\Exception $e) {
             throw new OpenWAException(
                 "Failed to get session: " . $e->getMessage(),
@@ -325,17 +333,25 @@ class OpenWAClient
             excludeSecretsFromLog: $excludeSecretsFromLog
         );
 
-        if ($response->status() === 404) {
+        $status = $response->status();
+        $responseData = $response->json();
+        $responseMessage = strtolower((string) ($responseData['message'] ?? ''));
+
+        $shouldRecoverSession = $status === 404
+            || ($status === 400 && str_contains($responseMessage, 'session') && str_contains($responseMessage, 'not active'));
+
+        if ($shouldRecoverSession) {
             $resolvedSessionId = $this->resolveActiveSessionId();
 
             if ($resolvedSessionId !== null && $resolvedSessionId !== $this->sessionId) {
                 $previousSessionId = $this->sessionId;
                 $this->sessionId = $resolvedSessionId;
 
-                Log::channel(config('openwa.logging.channel', 'stack'))->warning('OpenWA session auto-recovered after 404', [
+                Log::channel(config('openwa.logging.channel', 'stack'))->warning('OpenWA session auto-recovered before retry', [
                     'previous_session_id' => $previousSessionId,
                     'resolved_session_id' => $resolvedSessionId,
                     'operation' => $operation,
+                    'status' => $status,
                 ]);
 
                 $response = $this->sendSessionRequest(

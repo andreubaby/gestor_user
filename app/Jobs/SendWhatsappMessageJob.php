@@ -7,6 +7,7 @@ use App\Models\WhatsappMessage;
 use App\Services\OpenWA\OpenWAClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  */
 class SendWhatsappMessageJob implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SerializesModels;
 
     /**
      * Número de intentos antes de fallar
