@@ -188,6 +188,27 @@ class MissingPunchReminderServiceTest extends TestCase
         $this->assertContains('omitido@example.com', $omittedEmails);
         $this->assertContains('campaign@example.com', $omittedEmails);
     }
+
+    public function test_preview_uses_trabajador_phone_when_email_mapping_has_no_phone(): void
+    {
+        DB::connection('mysql_polifonia')->table('trabajadores')->insert([
+            ['id' => 1, 'nombre' => 'Fallback TFNO', 'email' => 'fallback@example.com', 'tfno' => '600123123', 'activo' => 1],
+        ]);
+
+        /** @var WhatsappNotificationService&\Mockery\MockInterface $whatsapp */
+        $whatsapp = $this->mock(WhatsappNotificationService::class);
+        $service = new MissingPunchReminderService($whatsapp, app(FichajesDiariosService::class));
+
+        $report = $service->previewForDate(Carbon::createFromFormat('Y-m-d', '2026-05-12'));
+
+        $this->assertSame('ok', $report['status']);
+        $this->assertSame(1, $report['total_candidates']);
+
+        $candidate = $report['candidates'][0] ?? null;
+        $this->assertNotNull($candidate);
+        $this->assertSame(1, $candidate['trabajador_id']);
+        $this->assertSame('600123123', $candidate['tfno']);
+    }
 }
 
 

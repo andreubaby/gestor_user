@@ -1,0 +1,7 @@
+node_modules
+vendor
+maria app/node_modules
+.git
+storage/logs
+npm-debug.log
+public/storage
