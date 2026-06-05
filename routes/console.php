@@ -13,7 +13,8 @@ Schedule::command('app:execute-scheduled-automations')
     ->everyMinute()
     ->withoutOverlapping();
 
+// Se registra siempre; el comando ya decide si enviar o saltar por config/dia.
 Schedule::command('app:send-missing-punch-reminders')
     ->dailyAt((string) config('fichajes.missing_punch.schedule_time', '09:00'))
-    ->withoutOverlapping();
+    ->withoutOverlapping(120);
 

@@ -161,8 +161,12 @@
                         <p class="mt-1 font-medium text-slate-900">{{ $session['name'] ?? 'N/D' }}</p>
                     </div>
                     <div class="rounded-2xl bg-slate-50 px-4 py-3">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pendientes</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Jobs en cola</p>
                         <p class="mt-1 font-medium text-slate-900">{{ $diagnostics['jobs_pending'] ?? 0 }}</p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Mensajes pending</p>
+                        <p class="mt-1 font-medium text-slate-900">{{ $diagnostics['messages_pending'] ?? 0 }}</p>
                     </div>
                     <div class="rounded-2xl bg-slate-50 px-4 py-3">
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Grupos locales</p>

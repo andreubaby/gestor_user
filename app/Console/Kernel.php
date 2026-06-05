@@ -12,14 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // Ejecutar las automatizaciones programadas cada minuto
-        $schedule->command('app:execute-scheduled-automations')
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->onFailure(function () {
-                \Log::error('Error al ejecutar automatizaciones programadas');
-            });
-
+        // Scheduler principal definido en routes/console.php (Laravel 11/12 bootstrap).
     }
 
     /**

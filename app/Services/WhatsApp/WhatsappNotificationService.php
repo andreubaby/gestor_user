@@ -9,6 +9,7 @@ use App\Models\TrabajadorPolifonia;
 use App\Models\User;
 use App\Models\UserTrabajador;
 use App\Models\UsuarioVinculado;
+use App\Models\WhatsappMessage;
 use App\Services\OpenWA\OpenWAClient;
 use Illuminate\Support\Facades\Log;
 
@@ -93,7 +94,13 @@ class WhatsappNotificationService
         }
 
         if ($async) {
-            SendWhatsappMessageJob::dispatch($this->phoneToChatId($phone), $message, $user->id);
+            $pendingMessage = $this->createPendingMessage(
+                $this->phoneToChatId($phone),
+                $message,
+                $user->id
+            );
+
+            SendWhatsappMessageJob::dispatch($pendingMessage);
         } else {
             try {
                 $this->client->sendText($phone, $message);
@@ -113,7 +120,13 @@ class WhatsappNotificationService
     public function sendToPhone(string $phone, string $message, ?int $userId = null, bool $async = true): void
     {
         if ($async) {
-            SendWhatsappMessageJob::dispatch($this->phoneToChatId($phone), $message, $userId);
+            $pendingMessage = $this->createPendingMessage(
+                $this->phoneToChatId($phone),
+                $message,
+                $userId
+            );
+
+            SendWhatsappMessageJob::dispatch($pendingMessage);
         } else {
             $this->client->sendText($phone, $message);
         }
@@ -125,7 +138,9 @@ class WhatsappNotificationService
     public function sendToChatId(string $chatId, string $message, ?int $userId = null, bool $async = true): void
     {
         if ($async) {
-            SendWhatsappMessageJob::dispatch($chatId, $message, $userId);
+            $pendingMessage = $this->createPendingMessage($chatId, $message, $userId);
+
+            SendWhatsappMessageJob::dispatch($pendingMessage);
         } else {
             $this->client->sendTextToChatId($chatId, $message);
         }
@@ -283,7 +298,9 @@ class WhatsappNotificationService
         if ($async) {
             // Encolar un job por cada miembro
             $group->members()->each(function ($member) use ($message) {
-                SendWhatsappMessageJob::dispatch($member->chat_id, $message, null);
+                $pendingMessage = $this->createPendingMessage($member->chat_id, $message, null);
+
+                SendWhatsappMessageJob::dispatch($pendingMessage);
             });
 
             Log::channel('openwa')->info('Group message queued', [
@@ -305,6 +322,18 @@ class WhatsappNotificationService
                 }
             });
         }
+    }
+
+    protected function createPendingMessage(string $chatId, string $message, ?int $userId = null): WhatsappMessage
+    {
+        return WhatsappMessage::create([
+            'user_id' => $userId,
+            'session_id' => (string) config('openwa.session_id', 'default'),
+            'chat_id' => $chatId,
+            'text' => $message,
+            'direction' => 'outbound',
+            'status' => 'pending',
+        ]);
     }
 }
 

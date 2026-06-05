@@ -4,9 +4,13 @@ return [
     'missing_punch' => [
         'enabled' => (bool) env('MISSING_PUNCH_REMINDER_ENABLED', true),
         'schedule_time' => env('MISSING_PUNCH_REMINDER_TIME', '09:00'),
+        'default_workdays' => [1, 2, 3, 4, 5],
+        'workdays_by_email' => [
+            'diegojimenez291995@gmail.com' => [7, 1, 2, 3],
+        ],
         'message_template' => env(
             'MISSING_PUNCH_REMINDER_TEMPLATE',
-            'Hola {nombre}, ayer ({fecha}) no aparece ningun fichaje tuyo. Si corresponde, revisalo en la app.'
+            'Hola {nombre}, ayer ({fecha}) no aparece ningun fichaje tuyo. Si corresponde, revisalo en la app. fichajes.babyplant.es'
         ),
 
         // Dias festivos fijos (YYYY-MM-DD, separados por coma).

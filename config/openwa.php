@@ -42,7 +42,7 @@ return [
     | Se usa en rutas como: /api/sessions/{sessionId}/messages/send-text
     |
     */
-    'session_id' => env('OPENWA_SESSION_ID', 'default'),
+    'session_id' => env('OPENWA_SESSION_ID') ?: 'default',
 
     /*
     |--------------------------------------------------------------------------
