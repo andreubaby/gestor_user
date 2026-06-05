@@ -15,10 +15,18 @@ use Illuminate\Support\Facades\Schema;
 
 class MissingPunchReminderService
 {
+    /** @var WhatsappNotificationService */
+    protected $whatsappNotificationService;
+
+    /** @var FichajesDiariosService */
+    protected $fichajesDiariosService;
+
     public function __construct(
-        protected WhatsappNotificationService $whatsappNotificationService,
-        protected FichajesDiariosService $fichajesDiariosService,
+        WhatsappNotificationService $whatsappNotificationService,
+        FichajesDiariosService $fichajesDiariosService
     ) {
+        $this->whatsappNotificationService = $whatsappNotificationService;
+        $this->fichajesDiariosService = $fichajesDiariosService;
     }
 
     /**
@@ -39,12 +47,14 @@ class MissingPunchReminderService
         if (!config('fichajes.missing_punch.enabled', true)) {
             $result['status'] = 'skipped';
             $result['reason'] = 'disabled';
+            $this->logSendRun($result);
             return $result;
         }
 
         if ($this->isNonWorkingDay($date)) {
             $result['status'] = 'skipped';
             $result['reason'] = 'non_working_day';
+            $this->logSendRun($result);
             return $result;
         }
 
@@ -96,21 +106,31 @@ class MissingPunchReminderService
                 $sent++;
             }
 
-            Log::channel('openwa')->info('Missing punch reminders processed', [
-                'date' => $date->toDateString(),
-                'total_candidates' => $candidates->count(),
-                'sent' => $sent,
-                'skipped_no_phone' => $skippedNoPhone,
-                'skipped_duplicate' => $skippedDuplicate,
-            ]);
-
             $result['total_candidates'] = $candidates->count();
             $result['sent'] = $sent;
             $result['skipped_no_phone'] = $skippedNoPhone;
             $result['skipped_duplicate'] = $skippedDuplicate;
         }
 
+        $this->logSendRun($result);
+
         return $result;
+    }
+
+    /**
+     * @param array{date:string,status:string,reason?:string,total_candidates?:int,sent?:int,skipped_no_phone?:int,skipped_duplicate?:int} $result
+     */
+    protected function logSendRun(array $result): void
+    {
+        Log::channel('openwa')->info('Missing punch reminders processed', [
+            'date' => (string) ($result['date'] ?? ''),
+            'status' => (string) ($result['status'] ?? 'unknown'),
+            'reason' => isset($result['reason']) ? (string) $result['reason'] : null,
+            'total_candidates' => (int) ($result['total_candidates'] ?? 0),
+            'sent' => (int) ($result['sent'] ?? 0),
+            'skipped_no_phone' => (int) ($result['skipped_no_phone'] ?? 0),
+            'skipped_duplicate' => (int) ($result['skipped_duplicate'] ?? 0),
+        ]);
     }
 
     /**
@@ -215,6 +235,14 @@ class MissingPunchReminderService
             ->filter(fn (array $w) => (int) ($w['count'] ?? 0) === 0 && empty($w['absence_tipo']))
             ->values();
 
+        $omittedByScheduleCandidates = $rawCandidates
+            ->filter(fn (array $w) => !$this->isWorkerScheduledOnDate($w, $date))
+            ->values();
+
+        $rawCandidates = $rawCandidates
+            ->reject(fn (array $w) => !$this->isWorkerScheduledOnDate($w, $date))
+            ->values();
+
         $omittedEmails = $this->getOmittedEmails();
         $campaignUserIds = $this->getCampaignUserFichajeIds($workers);
 
@@ -236,6 +264,7 @@ class MissingPunchReminderService
 
         $omittedCandidates = $omittedByEmailCandidates
             ->concat($omittedByCampaignCandidates)
+            ->concat($omittedByScheduleCandidates)
             ->unique(fn (array $w) => (int) ($w['trabajador_id'] ?? 0))
             ->values();
 
@@ -277,6 +306,16 @@ class MissingPunchReminderService
             ->get(['trabajador_id', 'usuario_id', 'user_fichaje_id'])
             ->keyBy(fn ($v) => (int) $v->trabajador_id);
 
+        $phoneByTrabajadorId = TrabajadorPolifonia::query()
+            ->whereIn('id', $trabajadorIds->all())
+            ->get(['id', 'tfno'])
+            ->mapWithKeys(function ($row) {
+                $id = (int) ($row->id ?? 0);
+                $tfno = trim((string) ($row->tfno ?? ''));
+
+                return $id > 0 && $tfno !== '' ? [$id => $tfno] : [];
+            });
+
         $emails = $rows
             ->map(fn ($row) => strtolower(trim((string) ($row->email ?? ''))))
             ->filter(fn ($email) => $email !== '')
@@ -305,17 +344,22 @@ class MissingPunchReminderService
         }
 
         return $rows
-            ->map(function ($row) use ($vinculos, $phoneByEmail) {
+            ->map(function ($row) use ($vinculos, $phoneByEmail, $phoneByTrabajadorId) {
                 $trabajadorId = (int) ($row->trabajador_id ?? 0);
                 $v = $vinculos->get($trabajadorId);
                 $email = strtolower(trim((string) ($row->email ?? '')));
                 $phoneByEmailValue = $email !== '' ? (string) ($phoneByEmail->get($email) ?? '') : '';
+                $phoneByTrabajadorValue = (string) ($phoneByTrabajadorId->get($trabajadorId) ?? '');
+                $phoneFromRow = trim((string) ($row->tfno ?? ''));
+                $resolvedPhone = $phoneByEmailValue !== ''
+                    ? $phoneByEmailValue
+                    : ($phoneByTrabajadorValue !== '' ? $phoneByTrabajadorValue : $phoneFromRow);
 
                 return [
                     'trabajador_id' => $trabajadorId,
                     'nombre' => (string) ($row->nombre ?? ''),
                     'email' => (string) ($row->email ?? ''),
-                    'tfno' => $phoneByEmailValue !== '' ? $phoneByEmailValue : '',
+                    'tfno' => $resolvedPhone,
                     'usuario_id' => $v?->usuario_id ? (int) $v->usuario_id : null,
                     'user_fichaje_id' => $v?->user_fichaje_id ? (int) $v->user_fichaje_id : null,
                     'vinculado_fichajes' => (bool) ($row->vinculado_fichajes ?? false),
@@ -435,10 +479,6 @@ class MissingPunchReminderService
 
     protected function isNonWorkingDay(Carbon $date): bool
     {
-        if ($date->isSaturday() || $date->isSunday()) {
-            return true;
-        }
-
         if ($this->isHolidayByConfiguredDates($date)) {
             return true;
         }
@@ -519,6 +559,50 @@ class MissingPunchReminderService
             '{nombre}' => $replace['nombre'] ?? '',
             '{fecha}' => $replace['fecha'] ?? '',
         ]);
+    }
+
+    /**
+     * @param array<string,mixed> $worker
+     */
+    protected function isWorkerScheduledOnDate(array $worker, Carbon $date): bool
+    {
+        $workdays = $this->resolveWorkerWorkdays($worker);
+
+        if (empty($workdays)) {
+            return false;
+        }
+
+        return in_array($date->dayOfWeekIso, $workdays, true);
+    }
+
+    /**
+     * @param array<string,mixed> $worker
+     * @return array<int,int>
+     */
+    protected function resolveWorkerWorkdays(array $worker): array
+    {
+        $defaultWorkdays = collect((array) config('fichajes.missing_punch.default_workdays', [1, 2, 3, 4, 5]))
+            ->map(fn ($day) => (int) $day)
+            ->filter(fn (int $day) => $day >= 1 && $day <= 7)
+            ->unique()
+            ->values();
+
+        $email = strtolower(trim((string) ($worker['email'] ?? '')));
+        $workdaysByEmail = (array) config('fichajes.missing_punch.workdays_by_email', []);
+
+        if ($email !== '' && isset($workdaysByEmail[$email]) && is_array($workdaysByEmail[$email])) {
+            $override = collect($workdaysByEmail[$email])
+                ->map(fn ($day) => (int) $day)
+                ->filter(fn (int $day) => $day >= 1 && $day <= 7)
+                ->unique()
+                ->values();
+
+            if ($override->isNotEmpty()) {
+                return $override->all();
+            }
+        }
+
+        return $defaultWorkdays->all();
     }
 }
 

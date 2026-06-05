@@ -99,7 +99,9 @@
                         </div>
                     @endif
 
-                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Nombre *</label>
+                        <input type="text" name="name" required maxlength="120" value="{{ old('name') }}" placeholder="Ej: Onboarding nuevos colaboradores" class="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white input-focus outline-none">
                     </div>
 
                     <div>
@@ -270,6 +272,16 @@
 @endsection
 
 @section('page_scripts')
+@php
+    $templatesJson = ($templates ?? collect())->keyBy('id')->map(function ($t) {
+        return [
+            'id' => $t->id,
+            'name' => $t->name,
+            'description' => $t->description,
+            'actions' => $t->actions,
+        ];
+    })->toArray();
+@endphp
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('steps-container');
@@ -280,12 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = @json(csrf_token());
     const templateSelector = document.getElementById('template-selector');
     const applyTemplateBtn = document.getElementById('apply-template-btn');
-    const templates = @json(($templates ?? collect())->keyBy('id')->map(fn($t) => [
-        'id' => $t->id,
-        'name' => $t->name,
-        'description' => $t->description,
-        'actions' => $t->actions,
-    ])->toArray());
+    const templates = @json($templatesJson);
     const autosaveKey = 'automation-sequence-create-draft-v1';
 
     let stepIndex = 0;
