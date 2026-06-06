@@ -23,18 +23,15 @@ class TrabajadoresIndexService
         $sort   = $request->input('sort', 'nombre'); // nombre|email|activo|vinculado
         $dir    = $request->input('dir', 'asc');     // asc|desc
         $year   = (int) $request->input('vacation_year', date('Y'));
-        $grupo = $request->input('grupo'); // '' | null | 'ID'
-        $todos = $this->buildCollection($search);
+        $grupo  = $request->input('grupo');
 
-        $todos = $this->applyActivoFilter($todos, $activo);
-        $todos = $this->applySearchFilter($todos, $search);
+        // ⚡ Se pasan $search y $activo a buildCollection para empujar filtros a SQL
+        $todos = $this->buildCollection($search, $activo);
         $todos = $this->applyGroupFilter($todos, $grupo);
 
         $dupEmails = $this->getDuplicatedEmails($todos);
-
-        $todos = $this->applySort($todos, $sort, $dir);
-
-        $stats = $this->buildStats($todos);
+        $todos     = $this->applySort($todos, $sort, $dir);
+        $stats     = $this->buildStats($todos);
 
         [$items, $paginator] = $this->paginateAndDecorate($todos, $request, $year);
 
@@ -47,13 +44,20 @@ class TrabajadoresIndexService
             'stats'     => $stats,
             'dupEmails' => $dupEmails,
             'year'      => $year,
-            'grupo' => $grupo,
+            'grupo'     => $grupo,
         ];
     }
 
-    public function buildCollection(?string $search = null): Collection
+    /**
+     * ⚡ Construye la colección unificada de trabajadores aplicando filtros en SQL
+     * para la parte no-vinculada y en PHP para la parte vinculada (subconjunto pequeño).
+     *
+     * Se eliminaron applyActivoFilter() y applySearchFilter() del flujo principal
+     * ya que los filtros ahora se aplican aquí directamente.
+     */
+    public function buildCollection(?string $search = null, $activo = null): Collection
     {
-        // 1) Vinculos + representante
+        // 1) Vinculos + relaciones eager-loaded
         $vinculos = UsuarioVinculado::with([
             'usuario:id,nombre,email',
             'trabajador:id,nombre,email,activo',
@@ -67,47 +71,46 @@ class TrabajadoresIndexService
 
             if ($registro) {
                 $registro->uuid = $v->uuid;
-
                 $registro->tipo = match (true) {
                     $registro instanceof \App\Models\TrabajadorPolifonia => 'trabajador',
-                    $registro instanceof \App\Models\Usuario            => 'usuario',
-                    default                                             => 'pluton'
+                    $registro instanceof \App\Models\Usuario             => 'usuario',
+                    default                                              => 'pluton'
                 };
-
                 return $registro;
             }
-
             return null;
-        })->filter();
+        })
+        ->filter()
+        ->filter(fn($r) => ($r->tipo ?? null) === 'trabajador');
 
-        // 2) No vinculados (solo trabajadores polifonia)
-        $trabajadores = TrabajadorPolifonia::whereNotIn('id', $vinculos->pluck('trabajador_id')->filter())
+        // Aplicar filtros en PHP sobre el subconjunto vinculado (normalmente pequeño)
+        if ($activo !== null && $activo !== '') {
+            $vinculados = $vinculados->filter(fn($r) => (int)($r->activo ?? 0) === (int)$activo);
+        }
+        if ($search) {
+            $s = mb_strtolower($search);
+            $vinculados = $vinculados->filter(
+                fn($r) => str_contains(mb_strtolower($r->nombre ?? ''), $s)
+            );
+        }
+
+        // 2) No-vinculados: filtros activo + búsqueda directo en SQL ⚡
+        $trabajadores = TrabajadorPolifonia::whereNotIn(
+                'id',
+                $vinculos->pluck('trabajador_id')->filter()->values()->all()
+            )
             ->when($search, fn($q) => $q->where('nombre', 'like', "%{$search}%"))
+            ->when(
+                $activo !== null && $activo !== '',
+                fn($q) => $q->where('activo', (int)$activo)
+            )
             ->get()
             ->each(fn($t) => $t->tipo = 'trabajador');
 
-        // 3) Unificar SOLO trabajadores
-        return $vinculados
-            ->filter(fn($r) => ($r->tipo ?? null) === 'trabajador')
+        // 3) Unificar
+        return $vinculados->values()
             ->concat($trabajadores)
             ->values();
-    }
-
-    private function applyActivoFilter(Collection $todos, $activo): Collection
-    {
-        if ($activo !== null && $activo !== '') {
-            $todos = $todos->filter(fn($r) => (int)($r->activo ?? 0) === (int)$activo);
-        }
-        return $todos->values();
-    }
-
-    private function applySearchFilter(Collection $todos, ?string $search): Collection
-    {
-        if ($search) {
-            $s = mb_strtolower($search);
-            $todos = $todos->filter(fn($r) => str_contains(mb_strtolower($r->nombre ?? ''), $s));
-        }
-        return $todos->values();
     }
 
     private function applyGroupFilter(Collection $todos, $grupo): Collection
@@ -121,7 +124,6 @@ class TrabajadoresIndexService
             return $todos->values();
         }
 
-        // Pivot en DB principal (mysql)
         $ids = DB::connection('mysql')
             ->table('group_trabajador')
             ->where('group_id', $grupoId)
@@ -130,17 +132,14 @@ class TrabajadoresIndexService
             ->values()
             ->all();
 
-        // Si el grupo no tiene nadie -> lista vacía (sin romper nada)
         if (empty($ids)) {
             return collect();
         }
 
-        // En tu colección todos son trabajadores (tipo trabajador) y tienen id
         return $todos
             ->filter(fn($r) => in_array((int)($r->id ?? 0), $ids, true))
             ->values();
     }
-
 
     private function getDuplicatedEmails(Collection $todos): array
     {
@@ -156,16 +155,14 @@ class TrabajadoresIndexService
         $dir  = strtolower($dir) === 'desc' ? 'desc' : 'asc';
         $sort = in_array($sort, ['nombre', 'email', 'activo', 'vinculado'], true) ? $sort : 'nombre';
 
-        $sorted = $todos->sortBy(function ($r) use ($sort) {
+        return $todos->sortBy(function ($r) use ($sort) {
             return match ($sort) {
                 'email'     => mb_strtolower(trim($r->email ?? '')),
                 'activo'    => (int)($r->activo ?? 0),
                 'vinculado' => !empty($r->uuid) ? 1 : 0,
                 default     => mb_strtolower($r->nombre ?? ''),
             };
-        }, SORT_REGULAR, $dir === 'desc');
-
-        return $sorted->values();
+        }, SORT_REGULAR, $dir === 'desc')->values();
     }
 
     private function buildStats(Collection $todos): array
@@ -181,14 +178,12 @@ class TrabajadoresIndexService
     private function paginateAndDecorate(Collection $todos, Request $request, int $year): array
     {
         $perPage = 50;
-        $page = (int) $request->input('page', 1);
+        $page    = (int) $request->input('page', 1);
 
         $items = $todos->forPage($page, $perPage)->values();
 
-        // Bienestar (4 semanas) SOLO items de la página
+        // Bienestar y ausencias solo para la página actual (no toda la colección)
         $items = $this->bienestar->attachMoodUltimasSemanas($items, 4);
-
-        // Ausencias SOLO items de la página
         $items = $this->ausencias->attachAusenciasPayload($items, $year);
 
         $paginator = new LengthAwarePaginator(

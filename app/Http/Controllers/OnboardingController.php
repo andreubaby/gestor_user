@@ -45,8 +45,9 @@ class OnboardingController extends Controller
             return back()->withErrors(['pack' => 'Pack no válido.'])->withInput();
         }
 
-        Mail::to($worker->email)->send(new OnboardingMail($worker->nombre, $packs[$packKey]));
+        // ⚡ Mail::queue() libera el request HTTP de inmediato; el worker de cola lo envía en background.
+        Mail::to($worker->email)->queue(new OnboardingMail($worker->nombre, $packs[$packKey]));
 
-        return back()->with('success', '✅ Email enviado a '.$worker->email)->withInput();
+        return back()->with('success', '✅ Email en cola para '.$worker->email)->withInput();
     }
 }

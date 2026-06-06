@@ -46,7 +46,7 @@ class ScheduledAutomation extends Model
         }
 
         $now = Carbon::now();
-        $scheduledTime = Carbon::createFromTimeString($this->scheduled_time)->setDate(
+        $scheduledTime = Carbon::createFromTimeString($this->scheduledTimeString())->setDate(
             $now->year,
             $now->month,
             $now->day
@@ -102,7 +102,7 @@ class ScheduledAutomation extends Model
         $reference = ($reference ?? now())->copy();
         $daysOfWeek = $this->normalizedWeekdays();
 
-        $nextExecution = $reference->copy()->setTimeFromTimeString($this->scheduled_time);
+        $nextExecution = $reference->copy()->setTimeFromTimeString($this->scheduledTimeString());
 
         // If today's time has passed (or is exact now), move to next day first.
         if ($nextExecution->lessThanOrEqualTo($reference)) {
@@ -136,6 +136,21 @@ class ScheduledAutomation extends Model
             ->all();
     }
 
+    private function scheduledTimeString(): string
+    {
+        $raw = $this->getRawOriginal('scheduled_time') ?? ($this->attributes['scheduled_time'] ?? null);
+
+        if ($raw instanceof \DateTimeInterface) {
+            return $raw->format('H:i:s');
+        }
+
+        if (is_string($raw) && preg_match('/\d{2}:\d{2}(:\d{2})?/', $raw, $matches)) {
+            return strlen($matches[0]) === 5 ? $matches[0] . ':00' : $matches[0];
+        }
+
+        return Carbon::parse($this->scheduled_time)->format('H:i:s');
+    }
+
     /**
      * Effective next execution, recalculated if persisted value is stale.
      */
@@ -162,4 +177,3 @@ class ScheduledAutomation extends Model
         return $this->status === 'active';
     }
 }
-
