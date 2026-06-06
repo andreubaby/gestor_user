@@ -12,10 +12,6 @@ class BienestarService
 {
     /**
      * Adjunta $weeks valores de bienestar en $r->bienestar_ultimos.
-     *
-     * Resolución de IDs:
-     *  - Punch (nuevo sistema): trabajador_id → user_fichaje_id via UsuarioVinculado
-     *  - Fichar (fallback):     fichar.user_id = trabajador_id (Polifonía) directamente
      */
     public function attachMoodUltimasSemanas(Collection $items, int $weeks = 4): Collection
     {
@@ -44,6 +40,9 @@ class BienestarService
     /**
      * Devuelve: [ trabajador_id => [semana0, semana1, semana2, semana3] ]
      * semana0 = semana actual, semana1 = hace 1 semana, etc.
+     *
+     * ⚡ OPTIMIZADO: AVG/GROUP BY se calculan en SQL (1-2 queries) en vez de
+     * cargar todos los registros en PHP y agrupar en memoria.
      */
     public function moodPorWorkerId(Collection $workerIds, int $weeks = 4): Collection
     {
@@ -52,14 +51,14 @@ class BienestarService
         $startOldestWeek = now()->startOfWeek(Carbon::MONDAY)->subWeeks($weeks - 1)->startOfDay();
         $endThisWeek     = now()->endOfWeek(Carbon::MONDAY)->endOfDay();
 
-        $weekKeys = collect(range(0, $weeks - 1))->map(function ($i) {
-            return now()->startOfWeek(Carbon::MONDAY)->subWeeks($i)->startOfDay()->format('Y-m-d');
-        });
+        // Claves de semana (lunes de cada semana, más reciente primero)
+        $weekKeys = collect(range(0, $weeks - 1))->map(
+            fn($i) => now()->startOfWeek(Carbon::MONDAY)->subWeeks($i)->startOfDay()->format('Y-m-d')
+        );
 
-        // =========================
-        // A) NUEVO SISTEMA: Punch (mood, happened_at)
-        //    trabajador_id → user_fichaje_id via UsuarioVinculado
-        // =========================
+        // ─────────────────────────────────────────────────────────────────────
+        // Vinculos trabajador_id → user_fichaje_id
+        // ─────────────────────────────────────────────────────────────────────
         $vinculos = UsuarioVinculado::whereIn('trabajador_id', $workerIds->all())
             ->whereNotNull('user_fichaje_id')
             ->pluck('user_fichaje_id', 'trabajador_id')
@@ -67,53 +66,56 @@ class BienestarService
 
         $fichajeUserIds = $vinculos->values()->filter()->unique()->values()->all();
 
+        // ─────────────────────────────────────────────────────────────────────
+        // A) NUEVO SISTEMA: Punch — AVG en SQL ⚡
+        // ─────────────────────────────────────────────────────────────────────
         $punchAvgByUserWeek = collect();
 
         if (!empty($fichajeUserIds)) {
-            $punches = Punch::query()
-                ->select(['user_id', 'mood', 'happened_at'])
+            $punchRows = Punch::query()
+                ->selectRaw("
+                    user_id,
+                    DATE_SUB(DATE(happened_at), INTERVAL WEEKDAY(happened_at) DAY) AS week_start,
+                    ROUND(AVG(mood), 0) AS avg_mood
+                ")
                 ->whereIn('user_id', $fichajeUserIds)
                 ->whereBetween('happened_at', [$startOldestWeek, $endThisWeek])
                 ->whereNotNull('mood')
+                ->groupByRaw("user_id, DATE_SUB(DATE(happened_at), INTERVAL WEEKDAY(happened_at) DAY)")
                 ->get();
 
-            $punchAvgByUserWeek = $punches
-                ->groupBy(function ($row) {
-                    $monday = Carbon::parse($row->happened_at)
-                        ->startOfWeek(Carbon::MONDAY)
-                        ->startOfDay();
-                    return (int)$row->user_id . '|' . $monday->format('Y-m-d');
-                })
-                ->map(fn($g) => $g->avg('mood'));
+            // key: "user_id|YYYY-MM-DD" → avg_mood
+            $punchAvgByUserWeek = $punchRows->mapWithKeys(
+                fn($row) => [$row->user_id . '|' . $row->week_start => (float)$row->avg_mood]
+            );
         }
 
-        // =========================
-        // B) FALLBACK: Fichar (bienestar, fecha_hora)
-        //    fichar.user_id = trabajador_id de Polifonía directamente
-        // =========================
+        // ─────────────────────────────────────────────────────────────────────
+        // B) FALLBACK: Fichar — AVG en SQL ⚡
+        // ─────────────────────────────────────────────────────────────────────
         $ficharAvgByWorkerWeek = collect();
 
-        $fichajes = Fichar::query()
-            ->select(['user_id', 'bienestar', 'fecha_hora'])
+        $ficharRows = Fichar::query()
+            ->selectRaw("
+                user_id,
+                DATE_SUB(DATE(fecha_hora), INTERVAL WEEKDAY(fecha_hora) DAY) AS week_start,
+                ROUND(AVG(bienestar), 0) AS avg_mood
+            ")
             ->whereIn('user_id', $workerIds->all())
             ->whereBetween('fecha_hora', [$startOldestWeek, $endThisWeek])
             ->whereNotNull('bienestar')
+            ->groupByRaw("user_id, DATE_SUB(DATE(fecha_hora), INTERVAL WEEKDAY(fecha_hora) DAY)")
             ->get();
 
-        if ($fichajes->isNotEmpty()) {
-            $ficharAvgByWorkerWeek = $fichajes
-                ->groupBy(function ($row) {
-                    $monday = Carbon::parse($row->fecha_hora)
-                        ->startOfWeek(Carbon::MONDAY)
-                        ->startOfDay();
-                    return (int)$row->user_id . '|' . $monday->format('Y-m-d');
-                })
-                ->map(fn($g) => $g->avg('bienestar'));
+        if ($ficharRows->isNotEmpty()) {
+            $ficharAvgByWorkerWeek = $ficharRows->mapWithKeys(
+                fn($row) => [$row->user_id . '|' . $row->week_start => (float)$row->avg_mood]
+            );
         }
 
-        // =========================
-        // C) Resultado final por trabajador_id (Punch primero, Fichar como fallback)
-        // =========================
+        // ─────────────────────────────────────────────────────────────────────
+        // C) Resultado final por trabajador_id
+        // ─────────────────────────────────────────────────────────────────────
         return $workerIds->mapWithKeys(function ($workerId) use (
             $weekKeys,
             $vinculos,
@@ -128,7 +130,7 @@ class BienestarService
                 $punchAvgByUserWeek,
                 $ficharAvgByWorkerWeek
             ) {
-                // 1) Punch.mood (nuevo sistema, via UsuarioVinculado)
+                // 1) Punch.mood (nuevo sistema)
                 if ($fichajeUserId) {
                     $avg = $punchAvgByUserWeek->get($fichajeUserId . '|' . $weekMonday);
                     if ($avg !== null) {
@@ -136,7 +138,7 @@ class BienestarService
                     }
                 }
 
-                // 2) Fallback Fichar.bienestar (sistema antiguo, user_id = trabajador_id)
+                // 2) Fallback Fichar.bienestar
                 $avg = $ficharAvgByWorkerWeek->get($workerId . '|' . $weekMonday);
                 if ($avg !== null) {
                     return max(1, min(4, (int) round($avg)));
