@@ -5,7 +5,8 @@ namespace App\Services;
 use App\Models\TrabajadorPolifonia;
 use App\Models\UsuarioVinculado;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -14,320 +15,54 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FichajesDiariosService
 {
+    // ══════════════════════════════════════════════════════════════════════════
+    // API PÚBLICA
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Entry point para el controlador HTTP (recibe Request).
+     */
     public function handle(Request $request): array
     {
-        $date    = $request->input('date') ?: now()->format('Y-m-d'); // YYYY-mm-dd
-        $groupId = $request->input('grupo'); // opcional
+        $date    = $request->input('date') ?: now()->format('Y-m-d');
+        $groupId = $request->input('grupo');
+        $estado  = (string)($request->input('estado', '') ?? '');
 
-        // ✅ estado '' | 'activo' | 'inactivo'
-        $estado = (string)($request->input('estado', '') ?? '');
         if (!in_array($estado, ['', 'activo', 'inactivo'], true)) {
             $estado = '';
         }
 
-        /**
-         * =========================
-         * 1) TRABAJADORES (polifonía) + filtros estado/grupo
-         * =========================
-         */
-        $trabajadoresQuery = TrabajadorPolifonia::query()
-            ->select(['id', 'nombre', 'email', 'activo'])
-            ->orderBy('nombre');
+        return $this->computeForDate($date, $estado, $groupId);
+    }
 
-        if ($estado === 'activo') {
-            $trabajadoresQuery->where('activo', 1);
-        } elseif ($estado === 'inactivo') {
-            $trabajadoresQuery->where('activo', 0);
-        }
-
-        // Si hay grupo, filtramos por pivot (BD principal mysql)
-        if ($groupId !== null && $groupId !== '') {
-            $ids = DB::connection('mysql')
-                ->table('group_trabajador')
-                ->where('group_id', (int)$groupId)
-                ->pluck('trabajador_id')
-                ->map(fn ($v) => (int)$v)
-                ->all();
-
-            if (empty($ids)) {
-                return [
-                    'date'    => $date,
-                    'groupId' => $groupId,
-                    'estado'  => $estado,
-                    'rows'    => collect(),
-                    'stats'   => [
-                        'total'        => 0,
-                        'con_fichaje'  => 0,
-                        'sin_fichaje'  => 0,
-                        'en_ausencia'  => 0,
-                        'solo_entrada' => 0,
-                        'solo_salida'  => 0,
-                    ],
-                ];
-            }
-
-            $trabajadoresQuery->whereIn('id', $ids);
-        }
-
-        $trabajadores = $trabajadoresQuery->get();
-
-        /**
-         * =========================
-         * 1.5) AUSENCIAS DEL DÍA (V/P/B) por trabajador
-         * =========================
-         * ✅ Se calcula por FECHA (no por vacation_year) => evita bugs de años cruzados.
-         * Prioridad si hubiera más de una: B > P > V
-         */
-        $trabajadorIds = $trabajadores->pluck('id')->map(fn ($v) => (int)$v)->values();
-
-        $absenceMap = collect(); // trabajador_id => 'V'|'P'|'B'|'L'
-        if ($trabajadorIds->isNotEmpty()) {
-            $absRaw = DB::connection('mysql_polifonia') // ⚠️ cambia a tu conexión real si no es mysql
-            ->table('trabajadores_dias')    // ⚠️ cambia si la tabla se llama distinto
-            ->select(['trabajador_id', 'tipo'])
-                ->whereIn('trabajador_id', $trabajadorIds->all())
-                ->whereDate('fecha', $date)
-                ->get();
-
-            $prio = fn (string $tipo) => match (strtoupper($tipo)) {
-                'L' => 4,
-                'B' => 3,
-                'P' => 2,
-                'V' => 1,
-                default => 0,
-            };
-
-            $absenceMap = collect($absRaw)
-                ->groupBy(fn ($r) => (int)$r->trabajador_id)
-                ->map(function ($items) use ($prio) {
-                    $best = null;
-                    $bestPrio = 0;
-
-                    foreach ($items as $it) {
-                        $t = strtoupper((string)($it->tipo ?? ''));
-                        $p = $prio($t);
-                        if ($p > $bestPrio) {
-                            $bestPrio = $p;
-                            $best = $t;
-                        }
-                    }
-
-                    return $best; // 'B'|'P'|'V'|null
-                });
-        }
-
-        /**
-         * =========================
-         * 2) VÍNCULOS trabajador_id -> user_fichaje_id (BD principal)
-         * =========================
-         */
-        $vinculos = UsuarioVinculado::query()
-            ->whereIn('trabajador_id', $trabajadores->pluck('id'))
-            ->get(['trabajador_id', 'user_fichaje_id']);
-
-        $mapTrabajadorToFichajes = $vinculos
-            ->filter(fn ($v) => !empty($v->user_fichaje_id))
-            ->mapWithKeys(fn ($v) => [(int)$v->trabajador_id => (int)$v->user_fichaje_id]);
-
-        $fichajesUserIds = $mapTrabajadorToFichajes->values()->unique()->values();
-
-        /**
-         * =========================
-         * 3) RANGO DEL DÍA
-         * =========================
-         */
-        $start = Carbon::parse($date)->startOfDay()->format('Y-m-d H:i:s');
-        $end   = Carbon::parse($date)->endOfDay()->format('Y-m-d H:i:s');
-
-        /**
-         * =========================
-         * A) FICHAJES NUEVOS (mysql_fichajes.punches)
-         * =========================
-         */
-        $punches = collect();
-
-        if ($fichajesUserIds->isNotEmpty()) {
-            $punches = DB::connection('mysql_fichajes')
-                ->table('punches')
-                ->select(['id', 'user_id', 'type', 'mood', 'happened_at', 'is_manual', 'note'])
-                ->whereIn('user_id', $fichajesUserIds->all())
-                ->whereBetween('happened_at', [$start, $end])
-                ->orderBy('happened_at')
-                ->get();
-        }
-
-        // Normalizar punches nuevos (por trabajador_id)
-        $punchesFichajes = $punches
-            ->map(function ($p) {
-                $type = strtolower((string)($p->type ?? ''));
-
-                return [
-                    'origen'        => 'fichajes',
-                    'trabajador_id' => null, // se asigna luego
-                    'type'          => $type === 'in' ? 'in' : ($type === 'out' ? 'out' : $type),
-                    'hora'          => $p->happened_at ? Carbon::parse($p->happened_at)->format('H:i') : '—',
-                    'datetime'      => $p->happened_at,
-                    'mood'          => is_null($p->mood) ? null : (int)$p->mood,
-                    'is_manual'     => (int)($p->is_manual ?? 0),
-                    'note'          => $p->note ?? null,
-                    'raw_user_id'   => (int)$p->user_id,
-                ];
-            })
-            ->values();
-
-        // user_id fichajes -> trabajador_id
-        $mapFichajesToTrabajador = $mapTrabajadorToFichajes->flip(); // [user_fichaje_id => trabajador_id]
-
-        $punchesFichajes = $punchesFichajes
-            ->map(function ($p) use ($mapFichajesToTrabajador) {
-                $tid = $mapFichajesToTrabajador->get($p['raw_user_id']);
-                if ($tid) {
-                    $p['trabajador_id'] = (int)$tid;
-                }
-                return $p;
-            })
-            ->filter(fn ($p) => !empty($p['trabajador_id']))
-            ->values();
-
-        /**
-         * =========================
-         * B) FICHAJES ANTIGUOS (BD trabajadores / mysql_polifonia)
-         * =========================
-         */
-        $fichajesTrabajadores = DB::connection('mysql_trabajadores')
-            ->table('fichar') // ⚠️ ajusta si el nombre real difiere
-            ->select(['user_id', 'tipo', 'fecha_hora', 'bienestar'])
-            ->whereIn('user_id', $trabajadores->pluck('id'))
-            ->whereBetween('fecha_hora', [$start, $end])
-            ->orderBy('fecha_hora')
-            ->get()
-            ->map(function ($f) {
-                $tipo = strtoupper((string)($f->tipo ?? ''));
-
-                $type = match ($tipo) {
-                    'I', 'IN', 'ENTRADA' => 'in',
-                    'F', 'OUT', 'SALIDA' => 'out',
-                    default              => 'fichaje',
-                };
-
-                return [
-                    'origen'        => 'trabajadores',
-                    'trabajador_id' => (int)$f->user_id,
-                    'type'          => $type,
-                    'hora'          => $f->fecha_hora
-                        ? Carbon::parse($f->fecha_hora)->format('H:i')
-                        : '—',
-                    'datetime'      => $f->fecha_hora,
-                    'mood'          => is_null($f->bienestar) ? null : (int)$f->bienestar,
-                    'is_manual'     => null,
-                    'note'          => null,
-                    'raw_user_id'   => null,
-                ];
-            })
-            ->values();
-
-        /**
-         * =========================
-         * UNIFICAR AMBAS FUENTES
-         * =========================
-         */
-        $allPunches = $punchesFichajes
-            ->concat($fichajesTrabajadores)
-            ->sortBy('datetime')
-            ->values();
-
-        $punchesByTrabajador = $allPunches->groupBy('trabajador_id');
-
-        /**
-         * =========================
-         * 4) CONSTRUIR FILAS (por trabajador)
-         * =========================
-         */
-        $rows = $trabajadores->map(function ($t) use ($mapTrabajadorToFichajes, $punchesByTrabajador, $date, $absenceMap) {
-            $trabajadorId = (int)$t->id;
-            $fu = $mapTrabajadorToFichajes->get($trabajadorId); // user_id en fichajes (puede ser null)
-
-            $userPunches = $punchesByTrabajador->get($trabajadorId) ?? collect();
-
-            $entradas = $userPunches->filter(fn ($p) => ($p['type'] ?? '') === 'in');
-            $salidas  = $userPunches->filter(fn ($p) => ($p['type'] ?? '') === 'out');
-
-            $firstIn = $entradas->first()['hora'] ?? null;
-            $lastOut = $salidas->last()['hora'] ?? null;
-
-            $absenceTipo = $absenceMap->get($trabajadorId); // 'V'|'P'|'B'|null
-
-            return (object)[
-                'date'          => $date,
-                'trabajador_id' => $trabajadorId,
-                'nombre'        => $t->nombre,
-                'email'         => $t->email,
-                'activo'        => (int)($t->activo ?? 0),
-
-                // ✅ NUEVO: causa de no fichar (si aplica)
-                'absence_tipo'  => $absenceTipo,
-
-                // aunque no esté vinculado en "fichajes", puede fichar en la BD vieja
-                'vinculado_fichajes' => (bool)$fu,
-                'user_fichajes_id'   => $fu,
-
-                'count'    => $userPunches->count(),
-                'first_in' => $firstIn,
-                'last_out' => $lastOut,
-
-                'solo_entrada' => $entradas->count() > 0 && $salidas->count() === 0,
-                'solo_salida'  => $salidas->count() > 0 && $entradas->count() === 0,
-
-                'punches' => $userPunches->map(function ($p) {
-                    $type = (string)($p['type'] ?? '');
-                    return [
-                        'type'      => $type === 'in' ? 'entrada' : ($type === 'out' ? 'salida' : $type),
-                        'hora'      => $p['hora'] ?? '—',
-                        'mood'      => $p['mood'] ?? null,
-                        'is_manual' => $p['is_manual'] ?? null,
-                        'note'      => $p['note'] ?? null,
-                        'origen'    => $p['origen'] ?? null,
-                    ];
-                })->values()->all(),
-            ];
-        })->values();
-
-        /**
-         * =========================
-         * 5) STATS (sin fichaje real vs en ausencia)
-         * =========================
-         */
-        $conFichaje  = $rows->filter(fn ($r) => ($r->count ?? 0) > 0)->count();
-        $soloEntrada = $rows->filter(fn ($r) => (bool)($r->solo_entrada ?? false))->count();
-        $soloSalida  = $rows->filter(fn ($r) => (bool)($r->solo_salida ?? false))->count();
-
-        $enAusencia = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && !empty($r->absence_tipo))->count();
-        $sinFichajeReal = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && empty($r->absence_tipo))->count();
-
-        $stats = [
-            'total'        => $rows->count(),
-            'con_fichaje'  => $conFichaje,
-            'sin_fichaje'  => $sinFichajeReal, // ✅ ahora es “no fichó” real
-            'en_ausencia'  => $enAusencia,     // ✅ opcional (para una tarjeta extra)
-            'solo_entrada' => $soloEntrada,
-            'solo_salida'  => $soloSalida,
-        ];
-
-        return [
-            'date'    => $date,
-            'groupId' => $groupId,
-            'estado'  => $estado,
-            'rows'    => $rows,
-            'stats'   => $stats,
-        ];
+    /**
+     * ⚡ API programática: obtiene las filas para una fecha sin necesidad de fabricar un Request.
+     * Úsalo desde Jobs/Services (ej. MissingPunchReminderService).
+     */
+    public function getRowsForDate(CarbonInterface $date, string $estado = 'activo', ?string $groupId = null): Collection
+    {
+        $result = $this->computeForDate($date->format('Y-m-d'), $estado, $groupId);
+        return $result['rows'];
     }
 
     public function exportExcel(Request $request): BinaryFileResponse
     {
-        $month        = $request->input('month') ?: now()->format('Y-m'); // YYYY-MM
-        $groupId      = $request->input('grupo');                         // opcional
-        $estado       = (string)($request->input('estado', '') ?? '');     // '' | activo | inactivo
-        $trabajadorId = $request->input('trabajador_id');                 // opcional (individual)
+        [$tmpPath, $fileName] = $this->generateExcelFile($request->all());
+        return response()->download($tmpPath, $fileName)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * ⚡ Genera el Excel y lo guarda en un path temporal.
+     * Extraído para que GenerateFichajesExcelJob pueda invocarlo sin HTTP.
+     *
+     * @return array{0:string,1:string} [$tmpPath, $fileName]
+     */
+    public function generateExcelFile(array $params): array
+    {
+        $month        = $params['month'] ?? now()->format('Y-m');
+        $groupId      = $params['grupo'] ?? null;
+        $estado       = (string)($params['estado'] ?? '');
+        $trabajadorId = $params['trabajador_id'] ?? null;
 
         if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
             $month = now()->format('Y-m');
@@ -357,10 +92,10 @@ class FichajesDiariosService
             ->filter(fn($v) => !empty($v->user_fichaje_id))
             ->mapWithKeys(fn($v) => [(int)$v->trabajador_id => (int)$v->user_fichaje_id]);
 
-        $fichajesUserIds = $mapTrabajadorToFichajes->values()->unique()->values();
-        $mapFichajesToTrabajador = $mapTrabajadorToFichajes->flip(); // [user_fichaje_id => trabajador_id]
+        $fichajesUserIds         = $mapTrabajadorToFichajes->values()->unique()->values();
+        $mapFichajesToTrabajador = $mapTrabajadorToFichajes->flip();
 
-        // 3) punches “nuevos” (mysql_fichajes) del mes
+        // 3) punches "nuevos" (mysql_fichajes) del mes
         $punchesFichajes = collect();
 
         if ($fichajesUserIds->isNotEmpty()) {
@@ -375,8 +110,7 @@ class FichajesDiariosService
             $punchesFichajes = collect($raw)->map(function ($p) use ($mapFichajesToTrabajador) {
                 $type = strtolower((string)$p->type);
                 if ($type !== 'in' && $type !== 'out') $type = 'other';
-
-                $tid = $mapFichajesToTrabajador->get((int)$p->user_id);
+                $tid  = $mapFichajesToTrabajador->get((int)$p->user_id);
 
                 return [
                     'origen'        => 'fichajes',
@@ -387,11 +121,11 @@ class FichajesDiariosService
             })->filter(fn($p) => !empty($p['trabajador_id']))->values();
         }
 
-        // 4) punches “viejos” (mysql_trabajadores) del mes
+        // 4) punches "viejos" (mysql_trabajadores) del mes
         $punchesTrab = collect();
 
         if ($trabajadores->isNotEmpty()) {
-            $fk = $this->detectFicharTrabajadorFkColumn(); // ✅ AUTO-DETECTA la columna real
+            $fk = $this->detectFicharTrabajadorFkColumn();
 
             $rawOld = DB::connection('mysql_trabajadores')
                 ->table('fichar')
@@ -431,10 +165,9 @@ class FichajesDiariosService
         $spreadsheet->removeSheetByIndex(0);
 
         foreach ($trabajadores as $t) {
-            $tid = (int)$t->id;
-
-            $sheetName = $this->safeSheetName($t->nombre ?: ('Trabajador_'.$tid));
-            $sheet = $spreadsheet->createSheet();
+            $tid       = (int)$t->id;
+            $sheetName = $this->safeSheetName($t->nombre ?: ('Trabajador_' . $tid));
+            $sheet     = $spreadsheet->createSheet();
             $sheet->setTitle($sheetName);
 
             // ===== Cabecera superior =====
@@ -445,56 +178,48 @@ class FichajesDiariosService
             $sheet->setCellValue('A3', 'Mes');
             $sheet->setCellValue('B3', $month);
 
-            // Estilo cabecera superior
             $sheet->getStyle('A1:A3')->getFont()->setBold(true);
             $sheet->getStyle('A1:B3')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
             $sheet->getStyle('A1:B3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
 
-            // Línea de separación
             $sheet->setCellValue('A4', '');
             $sheet->mergeCells('A4:E4');
 
             // ===== Cabecera tabla =====
             $sheet->fromArray(['Fecha', 'Entrada', 'Salida', 'Horas (hh:mm)', 'Origen'], null, 'A5');
-
-            // Estilo cabecera tabla
             $sheet->getStyle('A5:E5')->getFont()->setBold(true);
             $sheet->getStyle('A5:E5')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('A5:E5')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
-            $sheet->getStyle('A5:E5')->getFill()->getStartColor()->setARGB('FF15803D'); // verde
-            $sheet->getStyle('A5:E5')->getFont()->getColor()->setARGB('FFFFFFFF'); // blanco
+            $sheet->getStyle('A5:E5')->getFill()->getStartColor()->setARGB('FF15803D');
+            $sheet->getStyle('A5:E5')->getFont()->getColor()->setARGB('FFFFFFFF');
 
-            // Congelar y filtros
             $sheet->freezePane('A6');
             $sheet->setAutoFilter('A5:E5');
 
-            $rows = [];
+            $rows         = [];
             $totalMinutes = 0;
 
             $punches = collect($punchesByTrabajador->get($tid) ?? []);
-            $byDay = $punches->groupBy(fn($p) => $p['datetime']->format('Y-m-d'));
+            $byDay   = $punches->groupBy(fn($p) => $p['datetime']->format('Y-m-d'));
 
             $dayCursor = $start->copy();
             while ($dayCursor <= $end) {
-                $dayKey = $dayCursor->format('Y-m-d');
+                $dayKey    = $dayCursor->format('Y-m-d');
                 $dayPunches = collect($byDay->get($dayKey) ?? [])
                     ->sortBy(fn($p) => $p['datetime']->timestamp)
                     ->values();
 
-                $firstIn = optional($dayPunches->firstWhere('type', 'in'))['datetime'] ?? null;
-                $lastOut = optional($dayPunches->reverse()->firstWhere('type', 'out'))['datetime'] ?? null;
+                $firstIn   = optional($dayPunches->firstWhere('type', 'in'))['datetime'] ?? null;
+                $lastOut   = optional($dayPunches->reverse()->firstWhere('type', 'out'))['datetime'] ?? null;
+                $shiftType = $t->turno ?? 'office';
 
-                $shiftType = $t->turno ?? 'office'; // campaign/office/intensive
-
-                // ✅ Evitar 00:00 cuando solo hay entrada (sin salida):
-                // Solo calculamos horas si existe OUT.
                 $worked = null;
                 if ($lastOut) {
                     $worked = $this->calcWorkedMinutesWithBreaks($dayPunches, $shiftType);
                     $totalMinutes += $worked;
                 }
 
-                $origins = $dayPunches->pluck('origen')->unique()->values()->all();
+                $origins     = $dayPunches->pluck('origen')->unique()->values()->all();
                 $originLabel = count($origins) > 1 ? 'mixto' : ($origins[0] ?? '—');
 
                 $rows[] = [
@@ -508,30 +233,23 @@ class FichajesDiariosService
                 $dayCursor->addDay();
             }
 
-            $startRow = 6;
-            $sheet->fromArray($rows, null, 'A'.$startRow);
-
+            $startRow    = 6;
+            $sheet->fromArray($rows, null, 'A' . $startRow);
             $lastDataRow = $startRow + count($rows) - 1;
 
-            // Bordes + alineación tabla
             if ($lastDataRow >= $startRow) {
                 $range = "A5:E{$lastDataRow}";
                 $sheet->getStyle($range)->getBorders()->getAllBorders()
                     ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)
-                    ->getColor()->setARGB('FFE2E8F0'); // gris suave
+                    ->getColor()->setARGB('FFE2E8F0');
 
-                $sheet->getStyle("A{$startRow}:A{$lastDataRow}")
-                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle("A{$startRow}:A{$lastDataRow}")->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle("B{$startRow}:D{$lastDataRow}")->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("E{$startRow}:E{$lastDataRow}")->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
-                $sheet->getStyle("B{$startRow}:D{$lastDataRow}")
-                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-
-                $sheet->getStyle("E{$startRow}:E{$lastDataRow}")
-                    ->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-
-                // Resaltar filas:
-                // - Entrada sin salida => ámbar suave
-                // - No fichó (sin in y sin out) => rojo suave
                 for ($r = $startRow; $r <= $lastDataRow; $r++) {
                     $in  = (string)$sheet->getCell("B{$r}")->getValue();
                     $out = (string)$sheet->getCell("C{$r}")->getValue();
@@ -539,76 +257,274 @@ class FichajesDiariosService
                     if ($in !== '—' && $out === '—') {
                         $sheet->getStyle("A{$r}:E{$r}")->getFill()
                             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
-                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF7ED'); // ámbar suave
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF7ED');
                     } elseif ($in === '—' && $out === '—') {
                         $sheet->getStyle("A{$r}:E{$r}")->getFill()
                             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
-                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF1F2'); // rojo suave
+                        $sheet->getStyle("A{$r}:E{$r}")->getFill()->getStartColor()->setARGB('FFFFF1F2');
                     }
                 }
             }
 
-            // TOTAL bonito
             $totalRow = $lastDataRow + 2;
             $sheet->setCellValue("A{$totalRow}", 'TOTAL');
             $sheet->setCellValue("D{$totalRow}", $this->fmtMinutes($totalMinutes));
-
             $sheet->mergeCells("A{$totalRow}:C{$totalRow}");
             $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFont()->setBold(true);
             $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFill()
                 ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID);
-            $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFill()->getStartColor()->setARGB('FFF1F5F9'); // gris suave
+            $sheet->getStyle("A{$totalRow}:E{$totalRow}")->getFill()->getStartColor()->setARGB('FFF1F5F9');
             $sheet->getStyle("D{$totalRow}")->getAlignment()
                 ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
-            // AutoSize columnas
             foreach (range('A', 'E') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
         }
 
         $groupName = null;
-
         if ($groupId) {
-            $groupName = DB::connection('mysql')
-                ->table('groups')
-                ->where('id', (int)$groupId)
-                ->value('name');
-
+            $groupName = DB::connection('mysql')->table('groups')->where('id', (int)$groupId)->value('name');
             if ($groupName) {
-                $groupName = strtolower($groupName);
-                $groupName = preg_replace('/[^a-z0-9_-]+/i', '_', $groupName);
-                $groupName = trim($groupName, '_');
+                $groupName = trim(preg_replace('/[^a-z0-9_-]+/i', '_', strtolower($groupName)), '_');
             }
         }
 
-        $fileName = 'horas_'.$month;
-
-        if ($trabajadorId) {
-            $fileName .= '_trabajador_'.$trabajadorId;
-        }
-
-        if ($groupId) {
-            $fileName .= '_grupo_'.($groupName ?: $groupId); // ✅ ahora sale injerto en vez de 1 si existe nombre
-        }
-
+        $fileName  = 'horas_' . $month;
+        if ($trabajadorId) $fileName .= '_trabajador_' . $trabajadorId;
+        if ($groupId) $fileName .= '_grupo_' . ($groupName ?: $groupId);
         $fileName .= '.xlsx';
 
-        $tmpPath = storage_path('app/'.$fileName);
+        $tmpPath = storage_path('app/' . $fileName);
         (new Xlsx($spreadsheet))->save($tmpPath);
 
-        return response()->download($tmpPath, $fileName)->deleteFileAfterSend(true);
+        return [$tmpPath, $fileName];
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // NÚCLEO PRIVADO
+    // ══════════════════════════════════════════════════════════════════════════
 
-    // ==========================
-    // Helpers
-    // ==========================
+    /**
+     * Lógica central de cálculo de fichajes diarios.
+     * Llamado tanto por handle() como por getRowsForDate().
+     */
+    private function computeForDate(string $date, string $estado, ?string $groupId): array
+    {
+        // 1) TRABAJADORES
+        $trabajadoresQuery = TrabajadorPolifonia::query()
+            ->select(['id', 'nombre', 'email', 'activo'])
+            ->orderBy('nombre');
+
+        if ($estado === 'activo')   $trabajadoresQuery->where('activo', 1);
+        if ($estado === 'inactivo') $trabajadoresQuery->where('activo', 0);
+
+        if ($groupId !== null && $groupId !== '') {
+            $ids = DB::connection('mysql')
+                ->table('group_trabajador')
+                ->where('group_id', (int)$groupId)
+                ->pluck('trabajador_id')
+                ->map(fn ($v) => (int)$v)
+                ->all();
+
+            if (empty($ids)) {
+                return [
+                    'date'    => $date,
+                    'groupId' => $groupId,
+                    'estado'  => $estado,
+                    'rows'    => collect(),
+                    'stats'   => ['total' => 0, 'con_fichaje' => 0, 'sin_fichaje' => 0,
+                                  'en_ausencia' => 0, 'solo_entrada' => 0, 'solo_salida' => 0],
+                ];
+            }
+
+            $trabajadoresQuery->whereIn('id', $ids);
+        }
+
+        $trabajadores  = $trabajadoresQuery->get();
+        $trabajadorIds = $trabajadores->pluck('id')->map(fn ($v) => (int)$v)->values();
+
+        // 1.5) AUSENCIAS DEL DÍA
+        $absenceMap = collect();
+        if ($trabajadorIds->isNotEmpty()) {
+            $absRaw = DB::connection('mysql_polifonia')
+                ->table('trabajadores_dias')
+                ->select(['trabajador_id', 'tipo'])
+                ->whereIn('trabajador_id', $trabajadorIds->all())
+                ->whereDate('fecha', $date)
+                ->get();
+
+            $prio = fn (string $tipo) => match (strtoupper($tipo)) {
+                'L' => 4, 'B' => 3, 'P' => 2, 'V' => 1, default => 0,
+            };
+
+            $absenceMap = collect($absRaw)
+                ->groupBy(fn ($r) => (int)$r->trabajador_id)
+                ->map(function ($items) use ($prio) {
+                    $best = null; $bestPrio = 0;
+                    foreach ($items as $it) {
+                        $t = strtoupper((string)($it->tipo ?? ''));
+                        $p = $prio($t);
+                        if ($p > $bestPrio) { $bestPrio = $p; $best = $t; }
+                    }
+                    return $best;
+                });
+        }
+
+        // 2) VÍNCULOS
+        $vinculos = UsuarioVinculado::query()
+            ->whereIn('trabajador_id', $trabajadores->pluck('id'))
+            ->get(['trabajador_id', 'user_fichaje_id']);
+
+        $mapTrabajadorToFichajes = $vinculos
+            ->filter(fn ($v) => !empty($v->user_fichaje_id))
+            ->mapWithKeys(fn ($v) => [(int)$v->trabajador_id => (int)$v->user_fichaje_id]);
+
+        $fichajesUserIds         = $mapTrabajadorToFichajes->values()->unique()->values();
+        $mapFichajesToTrabajador = $mapTrabajadorToFichajes->flip();
+
+        // 3) RANGO DEL DÍA
+        $start = Carbon::parse($date)->startOfDay()->format('Y-m-d H:i:s');
+        $end   = Carbon::parse($date)->endOfDay()->format('Y-m-d H:i:s');
+
+        // A) FICHAJES NUEVOS
+        $punches = collect();
+        if ($fichajesUserIds->isNotEmpty()) {
+            $punches = DB::connection('mysql_fichajes')
+                ->table('punches')
+                ->select(['id', 'user_id', 'type', 'mood', 'happened_at', 'is_manual', 'note'])
+                ->whereIn('user_id', $fichajesUserIds->all())
+                ->whereBetween('happened_at', [$start, $end])
+                ->orderBy('happened_at')
+                ->get();
+        }
+
+        $punchesFichajes = $punches
+            ->map(function ($p) use ($mapFichajesToTrabajador) {
+                $type = strtolower((string)($p->type ?? ''));
+                $tid  = $mapFichajesToTrabajador->get((int)$p->user_id);
+                if (!$tid) return null;
+
+                return [
+                    'origen'        => 'fichajes',
+                    'trabajador_id' => (int)$tid,
+                    'type'          => $type === 'in' ? 'in' : ($type === 'out' ? 'out' : $type),
+                    'hora'          => $p->happened_at ? Carbon::parse($p->happened_at)->format('H:i') : '—',
+                    'datetime'      => $p->happened_at,
+                    'mood'          => is_null($p->mood) ? null : (int)$p->mood,
+                    'is_manual'     => (int)($p->is_manual ?? 0),
+                    'note'          => $p->note ?? null,
+                    'raw_user_id'   => (int)$p->user_id,
+                ];
+            })
+            ->filter()
+            ->values();
+
+        // B) FICHAJES ANTIGUOS
+        $fichajesTrabajadores = DB::connection('mysql_trabajadores')
+            ->table('fichar')
+            ->select(['user_id', 'tipo', 'fecha_hora', 'bienestar'])
+            ->whereIn('user_id', $trabajadores->pluck('id'))
+            ->whereBetween('fecha_hora', [$start, $end])
+            ->orderBy('fecha_hora')
+            ->get()
+            ->map(function ($f) {
+                $tipo = strtoupper((string)($f->tipo ?? ''));
+                $type = match ($tipo) {
+                    'I', 'IN', 'ENTRADA' => 'in',
+                    'F', 'OUT', 'SALIDA' => 'out',
+                    default              => 'fichaje',
+                };
+
+                return [
+                    'origen'        => 'trabajadores',
+                    'trabajador_id' => (int)$f->user_id,
+                    'type'          => $type,
+                    'hora'          => $f->fecha_hora ? Carbon::parse($f->fecha_hora)->format('H:i') : '—',
+                    'datetime'      => $f->fecha_hora,
+                    'mood'          => is_null($f->bienestar) ? null : (int)$f->bienestar,
+                    'is_manual'     => null,
+                    'note'          => null,
+                    'raw_user_id'   => null,
+                ];
+            })
+            ->values();
+
+        // UNIFICAR
+        $punchesByTrabajador = $punchesFichajes
+            ->concat($fichajesTrabajadores)
+            ->sortBy('datetime')
+            ->values()
+            ->groupBy('trabajador_id');
+
+        // 4) CONSTRUIR FILAS
+        $rows = $trabajadores->map(function ($t) use ($mapTrabajadorToFichajes, $punchesByTrabajador, $date, $absenceMap) {
+            $trabajadorId = (int)$t->id;
+            $fu           = $mapTrabajadorToFichajes->get($trabajadorId);
+            $userPunches  = $punchesByTrabajador->get($trabajadorId) ?? collect();
+
+            $entradas = $userPunches->filter(fn ($p) => ($p['type'] ?? '') === 'in');
+            $salidas  = $userPunches->filter(fn ($p) => ($p['type'] ?? '') === 'out');
+
+            return (object)[
+                'date'               => $date,
+                'trabajador_id'      => $trabajadorId,
+                'nombre'             => $t->nombre,
+                'email'              => $t->email,
+                'activo'             => (int)($t->activo ?? 0),
+                'absence_tipo'       => $absenceMap->get($trabajadorId),
+                'vinculado_fichajes' => (bool)$fu,
+                'user_fichajes_id'   => $fu,
+                'count'              => $userPunches->count(),
+                'first_in'           => $entradas->first()['hora'] ?? null,
+                'last_out'           => $salidas->last()['hora'] ?? null,
+                'solo_entrada'       => $entradas->count() > 0 && $salidas->count() === 0,
+                'solo_salida'        => $salidas->count() > 0 && $entradas->count() === 0,
+                'punches'            => $userPunches->map(function ($p) {
+                    $type = (string)($p['type'] ?? '');
+                    return [
+                        'type'      => $type === 'in' ? 'entrada' : ($type === 'out' ? 'salida' : $type),
+                        'hora'      => $p['hora'] ?? '—',
+                        'mood'      => $p['mood'] ?? null,
+                        'is_manual' => $p['is_manual'] ?? null,
+                        'note'      => $p['note'] ?? null,
+                        'origen'    => $p['origen'] ?? null,
+                    ];
+                })->values()->all(),
+            ];
+        })->values();
+
+        // 5) STATS
+        $conFichaje     = $rows->filter(fn ($r) => ($r->count ?? 0) > 0)->count();
+        $soloEntrada    = $rows->filter(fn ($r) => (bool)($r->solo_entrada ?? false))->count();
+        $soloSalida     = $rows->filter(fn ($r) => (bool)($r->solo_salida ?? false))->count();
+        $enAusencia     = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && !empty($r->absence_tipo))->count();
+        $sinFichajeReal = $rows->filter(fn ($r) => ($r->count ?? 0) === 0 && empty($r->absence_tipo))->count();
+
+        return [
+            'date'    => $date,
+            'groupId' => $groupId,
+            'estado'  => $estado,
+            'rows'    => $rows,
+            'stats'   => [
+                'total'        => $rows->count(),
+                'con_fichaje'  => $conFichaje,
+                'sin_fichaje'  => $sinFichajeReal,
+                'en_ausencia'  => $enAusencia,
+                'solo_entrada' => $soloEntrada,
+                'solo_salida'  => $soloSalida,
+            ],
+        ];
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // HELPERS (sin cambios)
+    // ══════════════════════════════════════════════════════════════════════════
 
     private function getTrabajadoresFiltrados($groupId, string $estado): Collection
     {
         $q = TrabajadorPolifonia::query()
-            ->select(['id','nombre','email','activo']) // (si tienes "turno" en este modelo, mejor añadirlo aquí)
+            ->select(['id','nombre','email','activo'])
             ->orderBy('nombre');
 
         if ($estado === 'activo')   $q->where('activo', 1);
@@ -629,65 +545,27 @@ class FichajesDiariosService
         return collect($q->get());
     }
 
-    /**
-     * Detecta la columna FK al trabajador en mysql_trabajadores.fichar
-     * para evitar “Unknown column ...”.
-     */
     private function detectFicharTrabajadorFkColumn(): string
     {
-        $cols = DB::connection('mysql_trabajadores')->select('DESCRIBE fichar');
+        $cols  = DB::connection('mysql_trabajadores')->select('DESCRIBE fichar');
         $names = array_map(fn($r) => strtolower((string)($r->Field ?? '')), $cols);
 
-        // candidatos típicos (ordénalos por probabilidad en tu proyecto)
-        $candidates = [
-            'trabajador_id',
-            'id_trabajador',
-            'idtrabajador',
-            'usuario_id',
-            'id_usuario',
-            'user_id',
-            'iduser',
-        ];
-
+        $candidates = ['trabajador_id','id_trabajador','idtrabajador','usuario_id','id_usuario','user_id','iduser'];
         foreach ($candidates as $c) {
-            if (in_array($c, $names, true)) {
-                return $c;
-            }
+            if (in_array($c, $names, true)) return $c;
         }
-
-        // fallback: intenta un campo que contenga "trabaj"
         foreach ($names as $n) {
             if (str_contains($n, 'trabaj')) return $n;
         }
 
-        throw new \RuntimeException("No se pudo detectar la columna FK de trabajador en mysql_trabajadores.fichar. Columnas: ".implode(',', $names));
-    }
-
-    private function calcWorkedMinutes(Collection $punches): int
-    {
-        $mins = 0;
-        $openIn = null;
-
-        foreach ($punches as $p) {
-            if (($p['type'] ?? '') === 'in') {
-                $openIn = $p['datetime'];
-                continue;
-            }
-            if (($p['type'] ?? '') === 'out' && $openIn) {
-                $diff = $openIn->diffInMinutes($p['datetime'], false);
-                if ($diff > 0) $mins += $diff;
-                $openIn = null;
-            }
-        }
-
-        return $mins;
+        throw new \RuntimeException('No se pudo detectar la columna FK de trabajador en mysql_trabajadores.fichar. Columnas: ' . implode(',', $names));
     }
 
     private function fmtMinutes(int $minutes): string
     {
         $h = intdiv(max(0, $minutes), 60);
         $m = max(0, $minutes) % 60;
-        return str_pad((string)$h, 2, '0', STR_PAD_LEFT).':'.str_pad((string)$m, 2, '0', STR_PAD_LEFT);
+        return str_pad((string)$h, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string)$m, 2, '0', STR_PAD_LEFT);
     }
 
     private function safeSheetName(string $name): string
@@ -700,21 +578,17 @@ class FichajesDiariosService
 
     private function calcWorkedMinutesWithBreaks(Collection $punches, string $shiftType): int
     {
-        // 1) intervalos trabajados (IN -> OUT)
         $workedIntervals = $this->buildWorkedIntervals($punches);
         if (empty($workedIntervals)) return 0;
 
-        // 2) bruto
         $gross = 0;
         foreach ($workedIntervals as [$s, $e]) {
             $diff = $s->diffInMinutes($e, false);
             if ($diff > 0) $gross += $diff;
         }
 
-        // 3) descansos (incluye regla campaign sin comida si acaban <= 16:00)
-        $breaks = $this->getBreakWindowsForShift($shiftType, $workedIntervals);
-
-        $deduct = 0;
+        $breaks  = $this->getBreakWindowsForShift($shiftType, $workedIntervals);
+        $deduct  = 0;
         foreach ($breaks as [$bs, $be]) {
             $deduct += $this->overlapMinutesWithIntervals($workedIntervals, $bs, $be);
         }
@@ -722,11 +596,6 @@ class FichajesDiariosService
         return max(0, $gross - $deduct);
     }
 
-    /**
-     * Devuelve intervalos trabajados por pares IN->OUT en orden.
-     * Ignora OUT sin IN y deja IN abierto sin OUT sin sumar.
-     * @return array{0:Carbon,1:Carbon}[]
-     */
     private function buildWorkedIntervals(Collection $punches): array
     {
         $sorted = $punches
@@ -735,19 +604,14 @@ class FichajesDiariosService
             ->values();
 
         $intervals = [];
-        $openIn = null;
+        $openIn    = null;
 
         foreach ($sorted as $p) {
             $type = $p['type'] ?? null;
-            if ($type === 'in') {
-                $openIn = $p['datetime'];
-                continue;
-            }
+            if ($type === 'in')  { $openIn = $p['datetime']; continue; }
             if ($type === 'out' && $openIn) {
                 $out = $p['datetime'];
-                if ($out->gt($openIn)) {
-                    $intervals[] = [$openIn->copy(), $out->copy()];
-                }
+                if ($out->gt($openIn)) $intervals[] = [$openIn->copy(), $out->copy()];
                 $openIn = null;
             }
         }
@@ -755,90 +619,51 @@ class FichajesDiariosService
         return $intervals;
     }
 
-    /**
-     * Ventanas de descanso del turno.
-     * IMPORTANTE para intensive: solo aplica UNA (mañana o tarde) según solape real con trabajo.
-     *
-     * @param array $workedIntervals [[start,end],...]
-     * @return array{0:Carbon,1:Carbon}[]  ventanas a descontar
-     */
     private function getBreakWindowsForShift(string $shiftType, array $workedIntervals): array
     {
-        $day = $workedIntervals[0][0]->copy()->startOfDay();
-
-        $make = function(string $hhmmA, string $hhmmB) use ($day) {
-            [$ha,$ma] = array_map('intval', explode(':', $hhmmA));
-            [$hb,$mb] = array_map('intval', explode(':', $hhmmB));
-            $a = $day->copy()->setTime($ha,$ma,0);
-            $b = $day->copy()->setTime($hb,$mb,0);
-            return [$a,$b];
+        $day  = $workedIntervals[0][0]->copy()->startOfDay();
+        $make = function(string $a, string $b) use ($day) {
+            [$ha, $ma] = array_map('intval', explode(':', $a));
+            [$hb, $mb] = array_map('intval', explode(':', $b));
+            return [$day->copy()->setTime($ha, $ma, 0), $day->copy()->setTime($hb, $mb, 0)];
         };
 
-        $shiftType = strtolower(trim($shiftType));
-
-        // ✅ último OUT del día (para decidir si descuentas comida)
-        $lastOut = null;
-        foreach (array_reverse($workedIntervals) as [$s,$e]) { $lastOut = $e; break; }
-        $lastOutHm = $lastOut ? $lastOut->format('H:i') : null;
+        $shiftType  = strtolower(trim($shiftType));
+        $lastOut    = null;
+        foreach (array_reverse($workedIntervals) as [$s, $e]) { $lastOut = $e; break; }
+        $lastOutHm  = $lastOut ? $lastOut->format('H:i') : null;
 
         if ($shiftType === 'campaign') {
-            $out = [
-                $make('10:00','10:30'), // almuerzo
-            ];
-
-            // ✅ comida 14-15 SOLO si terminan después de 16:00
-            if ($lastOutHm && $lastOutHm > '16:00') {
-                $out[] = $make('14:00','15:00');
-            }
-
+            $out = [$make('10:00', '10:30')];
+            if ($lastOutHm && $lastOutHm > '16:00') $out[] = $make('14:00', '15:00');
             return $out;
         }
 
         if ($shiftType === 'office') {
-            $out = [
-                $make('10:00','10:30'),
-            ];
-
-            // si terminan pronto, no quites la comida
-            if ($lastOutHm && $lastOutHm > '16:00') {
-                $out[] = $make('14:00','16:00');
-            }
-
+            $out = [$make('10:00', '10:30')];
+            if ($lastOutHm && $lastOutHm > '16:00') $out[] = $make('14:00', '16:00');
             return $out;
         }
 
         if ($shiftType === 'intensive') {
-            $morning = $make('10:00','10:30');
-            $evening = $make('19:00','19:30');
-
-            $morningOverlap = $this->overlapMinutesWithIntervals($workedIntervals, $morning[0], $morning[1]);
-            $eveningOverlap = $this->overlapMinutesWithIntervals($workedIntervals, $evening[0], $evening[1]);
-
-            if ($morningOverlap > 0 || $eveningOverlap > 0) {
-                return ($eveningOverlap > $morningOverlap) ? [$evening] : [$morning];
-            }
-
+            $morning = $make('10:00', '10:30');
+            $evening = $make('19:00', '19:30');
+            $mo      = $this->overlapMinutesWithIntervals($workedIntervals, $morning[0], $morning[1]);
+            $ev      = $this->overlapMinutesWithIntervals($workedIntervals, $evening[0], $evening[1]);
+            if ($mo > 0 || $ev > 0) return ($ev > $mo) ? [$evening] : [$morning];
             return [];
         }
 
         return [];
     }
 
-    /**
-     * Minutos de solape entre una ventana [bs,be] y TODOS los intervalos trabajados.
-     */
     private function overlapMinutesWithIntervals(array $workedIntervals, Carbon $bs, Carbon $be): int
     {
         $sum = 0;
-
         foreach ($workedIntervals as [$s, $e]) {
-            // max(start), min(end)
             $start = $s->greaterThan($bs) ? $s : $bs;
-            $end   = $e->lessThan($be) ? $e : $be;
-
-            if ($end->gt($start)) {
-                $sum += $start->diffInMinutes($end);
-            }
+            $end   = $e->lessThan($be)   ? $e : $be;
+            if ($end->gt($start)) $sum += $start->diffInMinutes($end);
         }
 
         return $sum;

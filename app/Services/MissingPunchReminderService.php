@@ -6,7 +6,6 @@ use App\Models\TrabajadorPolifonia;
 use App\Models\UsuarioVinculado;
 use App\Services\WhatsApp\WhatsappNotificationService;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -187,12 +186,11 @@ class MissingPunchReminderService
      */
     protected function evaluateDate(Carbon $date): array
     {
-        $dailyData = $this->fichajesDiariosService->handle(new Request([
-            'date' => $date->toDateString(),
-            'estado' => 'activo',
-        ]));
+        // ⚡ Se usa getRowsForDate() en lugar de fabricar un Request falso para handle().
+        //    Elimina el overhead del paso Request → handle → stats que no se necesitaban aquí.
+        $rows = $this->fichajesDiariosService->getRowsForDate($date, 'activo');
 
-        $workers = $this->buildWorkersFromDailyRows(collect($dailyData['rows'] ?? []));
+        $workers = $this->buildWorkersFromDailyRows($rows);
 
         if ($workers->isEmpty()) {
             return [
@@ -210,11 +208,12 @@ class MissingPunchReminderService
             ];
         }
 
+        // Calcular stats desde la colección de workers (ya tenemos toda la info)
         $stats = [
-            'total' => (int) ($dailyData['stats']['total'] ?? $workers->count()),
-            'con_fichaje' => (int) ($dailyData['stats']['con_fichaje'] ?? 0),
-            'sin_fichaje' => (int) ($dailyData['stats']['sin_fichaje'] ?? 0),
-            'en_ausencia' => (int) ($dailyData['stats']['en_ausencia'] ?? 0),
+            'total'       => $workers->count(),
+            'con_fichaje' => $workers->filter(fn (array $w) => (int)($w['count'] ?? 0) > 0)->count(),
+            'sin_fichaje' => $workers->filter(fn (array $w) => (int)($w['count'] ?? 0) === 0 && empty($w['absence_tipo']))->count(),
+            'en_ausencia' => $workers->filter(fn (array $w) => (int)($w['count'] ?? 0) === 0 && !empty($w['absence_tipo']))->count(),
         ];
 
         $usersWithPunches = $workers
