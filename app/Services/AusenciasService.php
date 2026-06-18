@@ -108,7 +108,7 @@ class AusenciasService
         return $this->buildAusenciasPayloadByCalendarYear($trabajadorId, (int)$data['calendar_year']);
     }
 
-    public function streamPdfVacaciones(int $trabajadorId, int $vacationYear, string $tipo): Response
+    public function streamPdfVacaciones(int $trabajadorId, int $vacationYear, string $tipo, ?string $fecha = null, ?int $fechaOffset = null): Response
     {
         try {
             $tipoRaw = $tipo;
@@ -230,7 +230,7 @@ class AusenciasService
                 'tipo'       => $tipoTexto,
                 'anyo'       => $vacationYear,
                 'rangos'     => $rangos,
-                'fecha'      => now()->format('d/m/Y'),
+                'fecha'      => $this->resolvePdfDate($fecha, $fechaOffset)->format('d/m/Y'),
             ];
 
             Log::info('[PDF STREAM] rendering PDF', [
@@ -264,6 +264,42 @@ class AusenciasService
 
             throw $e;
         }
+    }
+
+    public function resolvePdfDate(?string $fecha = null, ?int $fechaOffset = null): Carbon
+    {
+        $fecha = is_string($fecha) ? trim($fecha) : null;
+
+        if ($fecha !== null && $fecha !== '') {
+            foreach (['d/m/Y', 'Y-m-d', 'd-m-Y'] as $format) {
+                try {
+                    $parsed = Carbon::createFromFormat($format, $fecha);
+
+                    if ($parsed instanceof Carbon) {
+                        return $parsed->startOfDay();
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+
+            try {
+                return Carbon::parse($fecha)->startOfDay();
+            } catch (\Throwable $e) {
+                Log::warning('[PDF STREAM] invalid fecha, using today', [
+                    'fecha' => $fecha,
+                    'msg' => $e->getMessage(),
+                ]);
+
+                return now()->startOfDay();
+            }
+        }
+
+        if ($fechaOffset !== null) {
+            return now()->startOfDay()->addDays($fechaOffset);
+        }
+
+        return now()->startOfDay();
     }
 
     private function extendConsecutivosPosteriores(int $trabajadorId, string $tipo, Collection $diasBase, ?int $vacationYear = null): Collection

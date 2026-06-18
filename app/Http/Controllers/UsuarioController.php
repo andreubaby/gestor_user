@@ -16,6 +16,7 @@ use App\Models\Usuario;
 use App\Models\UsuarioVinculado;
 use App\Models\WorkerBuscador;
 use App\Services\AusenciasService;
+use App\Services\BulkUsuarioActionService;
 use App\Services\CatalogosService;
 use App\Services\FichajesService;
 use App\Services\TrabajadoresIndexService;
@@ -37,6 +38,7 @@ class UsuarioController extends Controller
         private readonly CatalogosService $catalogos,
         private readonly AusenciasService $ausencias,
         private readonly FichajesService $fichajesService,
+        private readonly BulkUsuarioActionService $bulkActions,
     ) {}
 
     public function index(Request $request)
@@ -281,12 +283,88 @@ class UsuarioController extends Controller
             'user_zeus_id' => 'nullable|integer',
 
             'user_fichaje_id' => 'nullable|integer',
+            'continue_workflow' => 'nullable|boolean',
+            'email_search' => 'nullable|email',
         ]);
 
         $this->vinculacion->validateExternalIds($data);
         $this->vinculacion->save($data);
 
+        if (!empty($data['continue_workflow'])) {
+            return $this->redirectToNextVinculacionCandidate($request, 'Vinculación guardada correctamente.');
+        }
+
         return redirect()->route('usuarios.index')->with('success', 'Vinculación guardada correctamente.');
+    }
+
+    public function vincularSuggestions(Request $request)
+    {
+        $payload = $request->validate([
+            'email' => 'nullable|email',
+            'uuid' => 'nullable|uuid',
+        ]);
+
+        $email = isset($payload['email']) ? mb_strtolower(trim($payload['email'])) : null;
+        $uuid = $payload['uuid'] ?? null;
+
+        if (!$email && !$uuid) {
+            return response()->json([
+                'ok' => true,
+                'suggestion' => null,
+            ]);
+        }
+
+        $matches = [
+            'usuario_id' => $this->lookupByEmailSafe(Usuario::query(), $email),
+            'trabajador_id' => $this->lookupByEmailSafe(TrabajadorPolifonia::on('mysql_polifonia'), $email),
+            'pluton_id' => $this->lookupByEmailSafe(UserPluton::on('mysql_pluton'), $email),
+            'user_buscador_id' => $this->lookupByEmailSafe(UserBuscador::on('mysql_buscador'), $email),
+            'worker_buscador_id' => $this->lookupByEmailSafe(WorkerBuscador::on('mysql_buscador'), $email),
+            'user_cronos_id' => $this->lookupByEmailSafe(UserCronos::on('mysql_cronos'), $email),
+            'user_semillas_id' => $this->lookupByEmailSafe(UserSemillas::on('mysql_semillas'), $email),
+            'user_store_id' => $this->lookupByEmailSafe(UserStore::on('mysql_store'), $email),
+            'user_zeus_id' => $this->lookupByEmailSafe(UserZeus::on('mysql_zeus'), $email),
+            'user_fichaje_id' => $this->lookupByEmailSafe(UserFichaje::on('mysql_fichajes'), $email),
+        ];
+
+        $linked = null;
+        if ($uuid) {
+            $linked = UsuarioVinculado::where('uuid', $uuid)->first();
+        }
+
+        if (!$linked) {
+            $linked = UsuarioVinculado::where(function ($query) use ($matches) {
+                foreach ($matches as $key => $id) {
+                    if (!empty($id)) {
+                        $query->orWhere($key, $id);
+                    }
+                }
+            })->first();
+        }
+
+        $resolvedUuid = $linked?->uuid ?? $uuid ?? (string) Str::uuid();
+        if ($linked) {
+            foreach (array_keys($matches) as $key) {
+                if (empty($matches[$key]) && !empty($linked->{$key})) {
+                    $matches[$key] = $linked->{$key};
+                }
+            }
+        }
+
+        $matchedCount = collect($matches)->filter()->count();
+        $score = min(100, ($matchedCount * 10) + ($linked ? 35 : 0) + ($uuid ? 10 : 0));
+
+        return response()->json([
+            'ok' => true,
+            'suggestion' => [
+                'uuid' => $resolvedUuid,
+                'email' => $email,
+                'score' => $score,
+                'matched_systems' => $matchedCount,
+                'ids' => $matches,
+                'linked_uuid_found' => (bool) $linked,
+            ],
+        ]);
     }
 
     public function vincularEdit(UsuarioVinculado $vinculo)
@@ -318,6 +396,8 @@ class UsuarioController extends Controller
             'user_zeus_id' => 'nullable|integer',
 
             'user_fichaje_id' => 'nullable|integer',
+            'continue_workflow' => 'nullable|boolean',
+            'email_search' => 'nullable|email',
         ]);
 
         $this->vinculacion->validateExternalIds($data);
@@ -326,7 +406,141 @@ class UsuarioController extends Controller
         // Solo guardamos lo demás + user_fichaje_id.
         $this->vinculacion->save(array_merge($data, ['uuid' => $vinculo->uuid]));
 
+        if (!empty($data['continue_workflow'])) {
+            return $this->redirectToNextVinculacionCandidate($request, 'Vinculación actualizada correctamente.');
+        }
+
         return redirect()->route('usuarios.index')->with('success', 'Vinculación actualizada correctamente.');
+    }
+
+    private function lookupByEmailSafe($query, ?string $email): ?int
+    {
+        if (!$email) {
+            return null;
+        }
+
+        try {
+            return $query->whereRaw('LOWER(email) = ?', [$email])->value('id');
+        } catch (\Throwable $e) {
+            Log::warning('[vincularSuggestions] Catálogo no disponible: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function redirectToNextVinculacionCandidate(Request $request, string $message)
+    {
+        $currentEmail = mb_strtolower(trim((string) $request->input('email_search', '')));
+
+        $nextCandidate = Usuario::query()
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereRaw('LOWER(email) > ?', [$currentEmail !== '' ? $currentEmail : ''])
+            ->whereNotIn('id', function ($query) {
+                $query->select('usuario_id')
+                    ->from('usuarios_vinculados')
+                    ->whereNotNull('usuario_id');
+            })
+            ->orderByRaw('LOWER(email) asc')
+            ->first(['id', 'email']);
+
+        if ($nextCandidate) {
+            return redirect()
+                ->route('usuarios.vincular', ['email' => $nextCandidate->email])
+                ->with('success', $message . ' Continuamos con el siguiente candidato.');
+        }
+
+        return redirect()
+            ->route('usuarios.vincular')
+            ->with('success', $message . ' No hay más candidatos pendientes por email.');
+    }
+
+    public function bulkActions(Request $request)
+    {
+        $data = $request->validate([
+            'action' => 'required|in:activate,deactivate,auto_link_email',
+            'worker_ids' => 'required|array|min:1',
+            'worker_ids.*' => 'integer|min:1',
+        ]);
+
+        $workerIds = $data['worker_ids'];
+
+        if ($data['action'] === 'activate') {
+            $result = $this->bulkActions->setActivoDetailed($workerIds, 1);
+            $okCount = count($result['ok']);
+            $skippedCount = count($result['skipped']);
+            $failedCount = count($result['failed']);
+
+            $message = "Activacion masiva completada. OK: {$okCount}";
+            if ($skippedCount > 0) {
+                $message .= ", omitidos: {$skippedCount}";
+            }
+            if ($failedCount > 0) {
+                $message .= ", fallidos: {$failedCount}";
+            }
+            $message .= '.';
+
+            return back()
+                ->with($failedCount > 0 ? 'error' : 'success', $message)
+                ->with('bulk_result', [
+                    'action' => 'activate',
+                    'total' => (int) ($result['processed'] ?? count($workerIds)),
+                    'ok' => $result['ok'] ?? [],
+                    'skipped' => $result['skipped'] ?? [],
+                    'failed' => $result['failed'] ?? [],
+                ]);
+        }
+
+        if ($data['action'] === 'deactivate') {
+            $result = $this->bulkActions->setActivoDetailed($workerIds, 0);
+            $okCount = count($result['ok']);
+            $skippedCount = count($result['skipped']);
+            $failedCount = count($result['failed']);
+
+            $message = "Desactivacion masiva completada. OK: {$okCount}";
+            if ($skippedCount > 0) {
+                $message .= ", omitidos: {$skippedCount}";
+            }
+            if ($failedCount > 0) {
+                $message .= ", fallidos: {$failedCount}";
+            }
+            $message .= '.';
+
+            return back()
+                ->with($failedCount > 0 ? 'error' : 'success', $message)
+                ->with('bulk_result', [
+                    'action' => 'deactivate',
+                    'total' => (int) ($result['processed'] ?? count($workerIds)),
+                    'ok' => $result['ok'] ?? [],
+                    'skipped' => $result['skipped'] ?? [],
+                    'failed' => $result['failed'] ?? [],
+                ]);
+        }
+
+        $stats = $this->bulkActions->autoLinkByEmail($workerIds);
+
+        $okCount = count($stats['ok'] ?? []);
+        $skippedCount = count($stats['skipped'] ?? []);
+        $failedCount = count($stats['failed'] ?? []);
+
+        $message = sprintf(
+            'Autovinculacion por email completada. Procesados: %d, creados: %d, actualizados: %d, sin email: %d, sin coincidencias: %d, con error: %d.',
+            $stats['processed'] ?? 0,
+            $stats['created'] ?? 0,
+            $stats['updated'] ?? 0,
+            $stats['no_email'] ?? 0,
+            $stats['no_match'] ?? 0,
+            $stats['errors'] ?? 0
+        );
+
+        return back()
+            ->with($failedCount > 0 ? 'error' : 'success', $message)
+            ->with('bulk_result', [
+                'action' => 'auto_link_email',
+                'total' => (int) ($stats['processed'] ?? count($workerIds)),
+                'ok' => $stats['ok'] ?? [],
+                'skipped' => $stats['skipped'] ?? [],
+                'failed' => $stats['failed'] ?? [],
+            ]);
     }
 
     public function exportExcel(Request $request)
@@ -504,12 +718,22 @@ class UsuarioController extends Controller
     {
         $year = (int) $request->query('vacation_year', now()->year);
         $tipo = strtoupper($request->query('tipo', 'V'));
+        $fecha = $request->query('fecha');
+        $fechaOffset = $request->query('fecha_offset');
 
-        return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, $tipo);
+        return $this->ausencias->streamPdfVacaciones(
+            (int) $trabajadorId,
+            $year,
+            $tipo,
+            is_string($fecha) && trim($fecha) !== '' ? $fecha : null,
+            $fechaOffset !== null && $fechaOffset !== '' ? (int) $fechaOffset : null,
+        );
     }
     public function permisos(Request $request, $trabajadorId)
     {
         $year = (int) $request->query('vacation_year', now()->year);
+        $fecha = $request->query('fecha');
+        $fechaOffset = $request->query('fecha_offset');
 
         Log::info('[PDF PERMISOS] request', [
             'trabajadorId' => $trabajadorId,
@@ -519,12 +743,20 @@ class UsuarioController extends Controller
             'query' => $request->query(),
         ]);
 
-        return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, 'P');
+        return $this->ausencias->streamPdfVacaciones(
+            (int) $trabajadorId,
+            $year,
+            'P',
+            is_string($fecha) && trim($fecha) !== '' ? $fecha : null,
+            $fechaOffset !== null && $fechaOffset !== '' ? (int) $fechaOffset : null,
+        );
     }
 
     public function bajas(Request $request, $trabajadorId)
     {
         $year = (int) $request->query('vacation_year', now()->year);
+        $fecha = $request->query('fecha');
+        $fechaOffset = $request->query('fecha_offset');
 
         Log::info('[PDF BAJAS] request', [
             'trabajadorId' => $trabajadorId,
@@ -534,7 +766,13 @@ class UsuarioController extends Controller
             'query' => $request->query(),
         ]);
 
-        return $this->ausencias->streamPdfVacaciones((int)$trabajadorId, $year, 'B');
+        return $this->ausencias->streamPdfVacaciones(
+            (int) $trabajadorId,
+            $year,
+            'B',
+            is_string($fecha) && trim($fecha) !== '' ? $fecha : null,
+            $fechaOffset !== null && $fechaOffset !== '' ? (int) $fechaOffset : null,
+        );
     }
 
 }
