@@ -111,12 +111,26 @@
                     Onboarding
                 </a>
 
+                {{-- Vincular (acceso directo) --}}
+                <a href="{{ route('usuarios.vincular') }}"
+                   class="{{ $tabBase }} {{ $active==='vincular' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='vincular' ? 'bg-white/15' : 'bg-slate-100' }}">🔗</span>
+                    Vincular
+                </a>
+
+                {{-- RRHH (acceso directo) --}}
+                <a href="{{ route('rrhh.documentos.index') }}"
+                   class="{{ $tabBase }} {{ $active==='rrhh' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='rrhh' ? 'bg-white/15' : 'bg-slate-100' }}">📁</span>
+                    RRHH
+                </a>
+
                 {{-- Dropdown Más --}}
                 <div class="relative group">
                     <button type="button"
-                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo','fichajes_create']) ? $tabActive : $tabIdle }}
+                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','asignar','tacografo','maria-app','fichajes_create']) ? $tabActive : $tabIdle }}
                            inline-flex items-center gap-2">
-                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo','fichajes_create']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
+                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','asignar','tacografo','maria-app','fichajes_create']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
                         Más
                         <span class="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-slate-700 transition
                              group-hover:bg-emerald-100 group-hover:text-emerald-800">
@@ -236,7 +250,14 @@
 </form>
 
 @php
-    $q = request()->query();
+    $q = array_filter([
+        'search' => $search ?? null,
+        'activo' => $activo ?? null,
+        'grupo' => $grupo ?? null,
+        'vacation_year' => $year ?? null,
+        'sort' => $sort ?? 'nombre',
+        'dir' => $dir ?? 'asc',
+    ], fn($value) => !is_null($value) && $value !== '');
 
     $sortLink = function($field) use ($q) {
         $currentSort = $q['sort'] ?? 'nombre';
@@ -255,6 +276,51 @@
 
 <main class="max-w-8xl mx-auto space-y-5 px-4 pb-10">
 
+    <x-ui.flash-messages />
+
+    @if(session('bulk_result'))
+                    @php
+                        $bulk = session('bulk_result');
+                    @endphp
+        <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-slate-900">Detalle de accion masiva (usuarios)</h3>
+                <p class="text-xs text-slate-500">
+                    Total: {{ (int) ($bulk['total'] ?? 0) }} · OK: {{ count($bulk['ok'] ?? []) }} · Omitidas: {{ count($bulk['skipped'] ?? []) }} · Fallidas: {{ count($bulk['failed'] ?? []) }}
+                </p>
+            </div>
+
+            <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <p class="mb-1 font-semibold text-emerald-700">OK</p>
+                    @forelse(($bulk['ok'] ?? []) as $row)
+                        <p class="text-emerald-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                    @empty
+                        <p class="text-emerald-700/80">Sin registros.</p>
+                    @endforelse
+                </div>
+
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p class="mb-1 font-semibold text-amber-700">Omitidas</p>
+                    @forelse(($bulk['skipped'] ?? []) as $row)
+                        <p class="text-amber-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                    @empty
+                        <p class="text-amber-700/80">Sin registros.</p>
+                    @endforelse
+                </div>
+
+                <div class="rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p class="mb-1 font-semibold text-red-700">Fallidas</p>
+                    @forelse(($bulk['failed'] ?? []) as $row)
+                        <p class="text-red-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                    @empty
+                        <p class="text-red-700/80">Sin registros.</p>
+                    @endforelse
+                </div>
+            </div>
+        </section>
+    @endif
+
     <!-- ✅ Toolbar alineada (buscador izq + export der) -->
     <section class="bg-white/80 backdrop-blur rounded-2xl ring-1 ring-emerald-100 shadow-soft p-5">
         <div class="flex flex-col gap-4">
@@ -270,7 +336,34 @@
 
                 <!-- Exportar Excel (derecha) -->
                 <div class="flex items-center gap-3 flex-wrap">
-                    <a href="{{ route('usuarios.export.excel', request()->query()) }}"
+                    <form id="bulkActionForm"
+                          method="POST"
+                          action="{{ route('usuarios.bulk.actions') }}"
+                          class="inline-flex items-center gap-2">
+                        @csrf
+                        <input type="hidden" name="_source" value="usuarios.index">
+
+                        <span id="bulkSelectedBadge"
+                              class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            0 seleccionados
+                        </span>
+
+                        <select id="bulkActionSelect"
+                                name="action"
+                                class="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                            <option value="activate">Activar seleccionados</option>
+                            <option value="deactivate">Desactivar seleccionados</option>
+                            <option value="auto_link_email">Autovincular por email</option>
+                        </select>
+
+                        <button type="button"
+                                onclick="submitBulkAction()"
+                                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition font-semibold focus:outline-none focus:ring-4 focus:ring-slate-300/40">
+                            Aplicar
+                        </button>
+                    </form>
+
+                    <a href="{{ route('usuarios.export.excel', $q) }}"
                        target="_blank" rel="noopener"
                        title="Exporta el listado con los filtros actuales"
                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white
@@ -304,8 +397,8 @@
                             class="w-full px-4 py-2.5 border border-slate-200 rounded-xl shadow-sm bg-white
                                    focus:ring-4 focus:ring-emerald-200 focus:border-emerald-400 focus:outline-none">
                         <option value="">Todos</option>
-                        <option value="1" {{ request('activo') === '1' ? 'selected' : '' }}>Activo</option>
-                        <option value="0" {{ request('activo') === '0' ? 'selected' : '' }}>Inactivo</option>
+                        <option value="1" {{ (string) ($activo ?? '') === '1' ? 'selected' : '' }}>Activo</option>
+                        <option value="0" {{ (string) ($activo ?? '') === '0' ? 'selected' : '' }}>Inactivo</option>
                     </select>
                 </div>
 
@@ -319,7 +412,7 @@
                         <option value="">Todos</option>
 
                         @foreach(($groups ?? []) as $g)
-                            <option value="{{ $g->id }}" {{ (string)request('grupo') === (string)$g->id ? 'selected' : '' }}>
+                            <option value="{{ $g->id }}" {{ (string)($grupo ?? '') === (string)$g->id ? 'selected' : '' }}>
                                 {{ $g->name ?? $g->nombre ?? ('Grupo '.$g->id) }}
                             </option>
                         @endforeach
@@ -342,8 +435,8 @@
 
                 <!-- Limpiar -->
                 <div class="md:col-span-2 md:flex md:justify-end">
-                    @if(request()->hasAny(['search','activo','grupo','sort','dir']))
-                        <a href="{{ route('usuarios.index') }}"
+                    @if(!empty($search) || (string)($activo ?? '') !== '' || (string)($grupo ?? '') !== '' || ($sort ?? 'nombre') !== 'nombre' || ($dir ?? 'asc') !== 'asc')
+                        <a href="{{ route('usuarios.index', ['reset_filters' => 1]) }}"
                            class="inline-flex px-3 py-2 text-sm font-medium text-slate-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition">
                             Limpiar
                         </a>
@@ -378,6 +471,12 @@
         <table class="min-w-full divide-y divide-emerald-100 text-sm table-auto">
             <thead class="bg-gradient-to-r from-emerald-700 to-emerald-600 text-white uppercase tracking-wider text-xs sticky top-0 z-10">
             <tr>
+                <th class="px-4 py-3 text-left w-[4%]">
+                    <input id="checkAllRows"
+                           type="checkbox"
+                           onclick="toggleAllRows(this.checked); event.stopPropagation();"
+                           class="h-4 w-4 rounded border-white/60 text-emerald-600 focus:ring-emerald-200">
+                </th>
                 <th class="px-6 py-3 text-left w-[26%]">
                     <a href="{{ $sortLink('nombre') }}"
                        class="hover:underline focus:outline-none focus:ring-2 focus:ring-white/40 rounded"
@@ -447,6 +546,16 @@
                     onclick="goRow('{{ $editRoute }}', event)"
                     onkeydown="if(event.key==='Enter'){ goRow('{{ $editRoute }}', event) }"
                 >
+                    <td class="px-4 py-4 align-middle">
+                        <input type="checkbox"
+                               class="row-check h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-300"
+                               value="{{ $registro->id }}"
+                               data-worker-name="{{ e($registro->nombre ?? ('Trabajador #' . $registro->id)) }}"
+                               data-worker-email="{{ e($registro->email ?? '') }}"
+                               onclick="event.stopPropagation(); onRowCheckChange();"
+                               onkeydown="event.stopPropagation();">
+                    </td>
+
                     <!-- Nombre -->
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2 flex-wrap">
@@ -626,7 +735,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-6 text-center text-slate-500">
+                    <td colspan="8" class="px-6 py-6 text-center text-slate-500">
                         No se encontraron trabajadores.
                     </td>
                 </tr>
@@ -826,6 +935,82 @@
 </div>
 
 <script>
+    function getCheckedRows() {
+        return Array.from(document.querySelectorAll('.row-check:checked')).map((el) => ({
+            id: Number(el.value),
+            name: String(el.dataset.workerName || `Trabajador #${el.value}`),
+            email: String(el.dataset.workerEmail || ''),
+        }));
+    }
+
+    function onRowCheckChange() {
+        const selected = getCheckedRows();
+        const badge = document.getElementById('bulkSelectedBadge');
+        if (badge) {
+            badge.textContent = `${selected.length} seleccionados`;
+        }
+
+        const allChecks = Array.from(document.querySelectorAll('.row-check'));
+        const checkAll = document.getElementById('checkAllRows');
+        if (checkAll) {
+            checkAll.checked = allChecks.length > 0 && selected.length === allChecks.length;
+            checkAll.indeterminate = selected.length > 0 && selected.length < allChecks.length;
+        }
+    }
+
+    function toggleAllRows(checked) {
+        document.querySelectorAll('.row-check').forEach((checkbox) => {
+            checkbox.checked = checked;
+        });
+        onRowCheckChange();
+    }
+
+    function submitBulkAction() {
+        const form = document.getElementById('bulkActionForm');
+        if (!form) return;
+
+        const selected = getCheckedRows();
+        if (selected.length === 0) {
+            alert('Selecciona al menos un trabajador para aplicar la acción masiva.');
+            return;
+        }
+
+        form.querySelectorAll('input[name="worker_ids[]"]').forEach((el) => el.remove());
+
+        selected.forEach((row) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'worker_ids[]';
+            input.value = String(row.id);
+            form.appendChild(input);
+        });
+
+        const action = document.getElementById('bulkActionSelect')?.value || '';
+        const actionLabel = {
+            activate: 'activar',
+            deactivate: 'desactivar',
+            auto_link_email: 'autovincular por email',
+        }[action] || 'procesar';
+
+        const preview = selected
+            .slice(0, 8)
+            .map((row) => `- #${row.id} ${row.name}${row.email ? ` (${row.email})` : ''}`)
+            .join('\n');
+        const remaining = selected.length > 8 ? `\n... y ${selected.length - 8} mas.` : '';
+
+        let confirmationMessage = `Se aplicara la accion \"${actionLabel}\" a ${selected.length} trabajador(es):\n\n${preview}${remaining}`;
+        if (action === 'auto_link_email') {
+            confirmationMessage += '\n\nLa autovinculacion solo usa coincidencia exacta de email.';
+        }
+
+        if (!confirm(confirmationMessage)) {
+            return;
+        }
+
+        setLoading(true);
+        form.submit();
+    }
+
     window.APP = {
         routes: {
             storeDays: @json(route('trabajadores.dias.store', ['trabajador' => '__ID__'])),
@@ -839,6 +1024,8 @@
         },
         csrf: @json(csrf_token()),
     };
+
+    document.addEventListener('DOMContentLoaded', onRowCheckChange);
 </script>
 
 <script src="{{ asset('js/ausencias.js') }}" defer></script>
@@ -852,5 +1039,6 @@
         });
     </script>
 @endif
+<x-ui.command-palette />
 </body>
 </html>

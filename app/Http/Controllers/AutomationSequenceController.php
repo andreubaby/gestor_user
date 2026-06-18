@@ -119,9 +119,23 @@ class AutomationSequenceController extends Controller
             $nextExecutions[$sequence->id] = $nextExecution;
         }
 
-        $query = trim((string) $request->input('q', ''));
-        $statusFilter = (string) $request->input('status', 'all');
-        $healthFilter = (string) $request->input('health', 'all');
+        if ($request->boolean('reset_filters')) {
+            $request->session()->forget('automation.sequences.filters');
+        }
+
+        $filterSessionKey = 'automation.sequences.filters';
+        $hasFilterInput = $request->hasAny(['q', 'status', 'health']);
+        $storedFilters = (array) $request->session()->get($filterSessionKey, []);
+
+        $query = trim((string) ($hasFilterInput ? $request->input('q', '') : ($storedFilters['q'] ?? '')));
+        $statusFilter = (string) ($hasFilterInput ? $request->input('status', 'all') : ($storedFilters['status'] ?? 'all'));
+        $healthFilter = (string) ($hasFilterInput ? $request->input('health', 'all') : ($storedFilters['health'] ?? 'all'));
+
+        $request->session()->put($filterSessionKey, [
+            'q' => $query,
+            'status' => $statusFilter,
+            'health' => $healthFilter,
+        ]);
 
         if ($query !== '') {
             $sequences = $sequences->filter(function (AutomationSequence $sequence) use ($query) {
@@ -481,6 +495,180 @@ class AutomationSequenceController extends Controller
         } else {
             return redirect()->back()->with('error', 'Error al ejecutar la secuencia de automatización');
         }
+    }
+
+    /**
+     * Ejecuta acciones masivas sobre secuencias seleccionadas.
+     */
+    public function bulkActions(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'action' => 'required|in:pause,activate,execute,duplicate,save_template',
+            'sequence_ids' => 'required|array|min:1',
+            'sequence_ids.*' => 'integer|exists:automation_sequences,id',
+        ]);
+
+        $ids = collect($data['sequence_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return redirect()->route('automation.sequences.index')
+                ->with('error', 'No se recibieron secuencias para acción masiva.');
+        }
+
+        $sequences = AutomationSequence::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        $result = [
+            'action' => $data['action'],
+            'total' => $ids->count(),
+            'ok' => [],
+            'skipped' => [],
+            'failed' => [],
+        ];
+
+        foreach ($ids as $id) {
+            /** @var AutomationSequence|null $sequence */
+            $sequence = $sequences->get($id);
+            if (!$sequence) {
+                $result['failed'][] = [
+                    'id' => $id,
+                    'name' => 'N/D',
+                    'reason' => 'Secuencia no encontrada',
+                ];
+                continue;
+            }
+
+            try {
+                if ($data['action'] === 'pause') {
+                    if ($sequence->status === 'paused') {
+                        $result['skipped'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Ya estaba pausada'];
+                    } else {
+                        $sequence->update(['status' => 'paused']);
+                        $result['ok'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Pausada'];
+                    }
+                    continue;
+                }
+
+                if ($data['action'] === 'activate') {
+                    if ($sequence->status === 'active') {
+                        $result['skipped'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Ya estaba activa'];
+                    } else {
+                        $sequence->update(['status' => 'active']);
+                        $result['ok'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Reactivada'];
+                    }
+                    continue;
+                }
+
+                if ($data['action'] === 'duplicate') {
+                    AutomationSequence::create([
+                        'name' => $this->nextAvailableSequenceName($sequence->name . ' (copia)'),
+                        'description' => $sequence->description,
+                        'actions' => $sequence->actions,
+                        'status' => 'inactive',
+                        'is_template' => false,
+                        'template_source_id' => $sequence->is_template ? $sequence->id : $sequence->template_source_id,
+                    ]);
+
+                    $result['ok'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Duplicada'];
+                    continue;
+                }
+
+                if ($data['action'] === 'save_template') {
+                    AutomationSequence::create([
+                        'name' => $this->nextAvailableSequenceName('Plantilla - ' . $sequence->name),
+                        'description' => $sequence->description,
+                        'actions' => $sequence->actions,
+                        'status' => 'inactive',
+                        'is_template' => true,
+                        'template_source_id' => $sequence->id,
+                    ]);
+
+                    $result['ok'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Plantilla creada'];
+                    continue;
+                }
+
+                if ($sequence->execute(auth()->id())) {
+                    $result['ok'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'Encolada'];
+                } else {
+                    $result['failed'][] = ['id' => $id, 'name' => $sequence->name, 'reason' => 'No se pudo encolar'];
+                }
+            } catch (\Throwable $e) {
+                $result['failed'][] = [
+                    'id' => $id,
+                    'name' => $sequence->name,
+                    'reason' => $e->getMessage(),
+                ];
+            }
+        }
+
+        $okCount = count($result['ok']);
+        $failedCount = count($result['failed']);
+        $skippedCount = count($result['skipped']);
+
+        $actionLabel = match ($data['action']) {
+            'pause' => 'pausar',
+            'activate' => 'reactivar',
+            'execute' => 'ejecutar',
+            'duplicate' => 'duplicar',
+            'save_template' => 'crear plantillas de',
+            default => 'procesar',
+        };
+
+        $message = "Acción masiva '{$actionLabel}': OK {$okCount}";
+        if ($skippedCount > 0) {
+            $message .= ", omitidas {$skippedCount}";
+        }
+        if ($failedCount > 0) {
+            $message .= ", fallidas {$failedCount}";
+        }
+        $message .= '.';
+
+        return redirect()->route('automation.sequences.index')
+            ->with($failedCount > 0 ? 'error' : 'success', $message)
+            ->with('bulk_result', $result);
+    }
+
+    public function exportBulkActionsCsv(Request $request): RedirectResponse|StreamedResponse
+    {
+        $bulk = $request->session()->get('bulk_result');
+
+        if (!is_array($bulk)) {
+            return redirect()->route('automation.sequences.index')
+                ->with('error', 'No hay resultado masivo disponible para exportar.');
+        }
+
+        $action = (string) ($bulk['action'] ?? 'unknown');
+        $filename = 'automation_bulk_result_' . now()->format('Ymd_His') . '.csv';
+
+        return response()->streamDownload(function () use ($bulk, $action) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['status', 'id', 'nombre', 'motivo', 'accion']);
+
+            $statusMap = [
+                'ok' => 'ok',
+                'skipped' => 'skipped',
+                'failed' => 'failed',
+            ];
+
+            foreach ($statusMap as $key => $statusLabel) {
+                foreach (($bulk[$key] ?? []) as $row) {
+                    fputcsv($handle, [
+                        $statusLabel,
+                        (int) ($row['id'] ?? 0),
+                        (string) ($row['name'] ?? 'N/D'),
+                        preg_replace('/\s+/', ' ', (string) ($row['reason'] ?? '')),
+                        $action,
+                    ]);
+                }
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function liveStatus(Request $request): JsonResponse

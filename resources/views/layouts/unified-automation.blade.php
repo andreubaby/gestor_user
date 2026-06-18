@@ -21,22 +21,31 @@
                 <span class="ui-title text-lg font-semibold tracking-tight">Panel Automation</span>
             </a>
             <nav class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:inline">Automatizar</span>
                 <a href="{{ route('automation.sequences.index') }}" class="ui-nav-link {{ request()->routeIs('automation.sequences.*') ? 'is-active' : '' }}">Secuencias</a>
                 <a href="{{ route('automation.audit.index') }}" class="ui-nav-link {{ request()->routeIs('automation.audit.*') ? 'is-active' : '' }}">Auditoria</a>
                 <a href="{{ route('automation.missing-punch.preview') }}" class="ui-nav-link {{ request()->routeIs('automation.missing-punch.*') ? 'is-active' : '' }}">No fichados</a>
+
+                <span class="hidden h-5 w-px bg-white/20 lg:inline"></span>
+                <span class="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:inline">Mensajeria</span>
                 <a href="{{ route('openwa.collab.index') }}" class="ui-nav-link {{ request()->routeIs('openwa.collab.*') ? 'is-active' : '' }}">OpenWA Colab</a>
                 <a href="{{ route('openwa.auto.index') }}" class="ui-nav-link {{ request()->routeIs('openwa.auto.*') ? 'is-active' : '' }}">OpenWA Auto</a>
+
+                <span class="hidden h-5 w-px bg-white/20 lg:inline"></span>
                 <a href="{{ route('gestor.gestoria') }}" class="ui-nav-link">Gestoria</a>
+                <a href="{{ route('automation.sequences.create') }}" class="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white shadow-sm transition hover:bg-blue-500">+ Nueva</a>
             </nav>
         </div>
     </header>
 
     <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-7">
+        <x-ui.flash-messages />
         @yield('content')
     </main>
 </div>
 @yield('page_scripts')
 @stack('scripts')
+<x-ui.command-palette />
 <script src="https://cdn.jsdelivr.net/npm/simple-datatables@9.0.3" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +22,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        RateLimiter::for('openwa-webhook', function (Request $request) {
+            $limit = max(10, (int) config('openwa.webhook_throttle_per_minute', 120));
+
+            return Limit::perMinute($limit)->by('openwa|' . $request->ip());
+        });
+
+        RateLimiter::for('timeguard-api', function (Request $request) {
+            return Limit::perMinute(120)->by('timeguard|' . $request->ip());
+        });
     }
 }

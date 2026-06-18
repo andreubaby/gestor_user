@@ -41,8 +41,10 @@ services:
             composer install --no-interaction --prefer-dist;
             mkdir -p /var/www/html/storage/framework/views /var/www/html/storage/framework/sessions /var/www/html/storage/framework/cache/data /var/www/html/storage/logs /var/www/html/bootstrap/cache;
             touch /var/www/html/storage/logs/laravel.log;
+            rm -f /var/www/html/public/hot;
             chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache;
-            chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache;
+            chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache;
+            chmod -R 775 /var/www/html/storage/logs;
             php artisan view:clear >/dev/null 2>&1 || true;
             exec php-fpm
             "
@@ -57,6 +59,7 @@ services:
         working_dir: /var/www/html
         depends_on:
             - db
+            - php
         volumes:
             - .:/var/www/html
             - vendor:/var/www/html/vendor
@@ -88,6 +91,7 @@ services:
         working_dir: /var/www/html
         depends_on:
             - db
+            - php
         volumes:
             - .:/var/www/html
             - vendor:/var/www/html/vendor
@@ -132,18 +136,13 @@ services:
         command: >
             sh -lc "
             echo 'El valor de APP_ENV es: ${APP_ENV}' &&
+            rm -f /var/www/html/public/hot &&
             npm install &&
             cd '/var/www/html/maria app' && npm install && cd /var/www/html &&
-            if [ '${APP_ENV}' = 'production' ]; then
-              npm run build &&
-                            rm -f public/hot &&
-                            cd '/var/www/html/maria app' && npm run build && cd /var/www/html;
-            else
-                            npm run build &&
-                            rm -f public/hot &&
-                            cd '/var/www/html/maria app' && npm run build && cd /var/www/html &&
-                            tail -f /dev/null;
-            fi
+            npm run build &&
+            rm -f /var/www/html/public/hot &&
+            cd '/var/www/html/maria app' && npm run build && cd /var/www/html &&
+            tail -f /dev/null
             "
         networks:
             - laravel

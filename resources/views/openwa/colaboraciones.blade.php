@@ -297,32 +297,7 @@
 <div class="text-slate-900">
 
 
-<!-- Alert Messages Container -->
-    <div class="mx-auto max-w-[1500px] px-4 py-4">
-    @if (session('success'))
-        <div class="mb-4 flex animate-fade-in-up items-start gap-3 rounded-xl border-l-4 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 p-4 text-green-900 shadow-sm">
-            <svg class="h-6 w-6 flex-shrink-0 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div class="flex-1">
-                <h3 class="font-semibold">¡Éxito!</h3>
-                <p class="text-sm text-opacity-90">{{ session('success') }}</p>
-            </div>
-        </div>
-    @endif
-
-    @if (session('error'))
-        <div class="mb-4 flex animate-fade-in-up items-start gap-3 rounded-xl border-l-4 border-red-500 bg-gradient-to-r from-red-50 to-pink-50 p-4 text-red-900 shadow-sm">
-            <svg class="h-6 w-6 flex-shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div class="flex-1">
-                <h3 class="font-semibold">Error</h3>
-                <p class="text-sm text-opacity-90">{{ session('error') }}</p>
-            </div>
-        </div>
-    @endif
-
+<div class="mx-auto max-w-[1500px] px-4 py-4">
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <!-- Sidebar -->
         <div class="space-y-4 xl:col-span-3">

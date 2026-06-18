@@ -20,10 +20,26 @@
         ->first();
 @endphp
 
-<div class="mb-5 gradient-card rounded-2xl p-6 card-hover group animate-slide-in sequence-card" data-sequence-id="{{ $sequence->id }}" style="animation-delay: {{ $loop->index * 0.1 }}s">
+<div
+    class="mb-5 gradient-card rounded-2xl p-6 card-hover group animate-slide-in sequence-card"
+    :class="isSelected({{ $sequence->id }}) ? 'ring-2 ring-blue-400/70 border-blue-300' : ''"
+    data-sequence-id="{{ $sequence->id }}"
+    data-sequence-show-url="{{ route('automation.sequences.show', $sequence) }}"
+    data-sequence-edit-url="{{ route('automation.sequences.edit', $sequence) }}"
+    style="animation-delay: {{ $loop->index * 0.1 }}s"
+>
     <div class="flex items-start justify-between gap-4">
         <div class="flex-1">
             <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <label class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700">
+                    <input
+                        type="checkbox"
+                        class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        :checked="isSelected({{ $sequence->id }})"
+                        @change="toggleSelected({{ $sequence->id }})"
+                    >
+                    Seleccionar
+                </label>
                 <h2 class="title-font text-xl font-bold text-slate-900">{{ $sequence->name }}</h2>
                 <span class="status-badge {{ $sequence->isActive() ? 'status-active' : 'status-inactive' }}">
                     <span class="w-2 h-2 rounded-full {{ $sequence->isActive() ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
@@ -33,6 +49,8 @@
                     <span class="w-2 h-2 rounded-full {{ $dotClass }}"></span>
                     {{ $light['label'] }}
                 </span>
+                <a href="{{ route('automation.sequences.show', $sequence) }}" class="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition">Ver</a>
+                <a href="{{ route('automation.sequences.edit', $sequence) }}" class="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">Editar</a>
                 <button
                     type="button"
                     class="ml-auto inline-flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
