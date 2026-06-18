@@ -608,6 +608,29 @@ function openPdfDebug(url) {
     window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function promptPdfDateValue() {
+    const today = new Date();
+    const defaultValue = formatDate(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    const value = window.prompt(
+        "Fecha para el PDF de vacaciones.\n\n" +
+        "- Deja vacío para usar hoy.\n" +
+        "- Usa +1 o -1 para mover un día.\n" +
+        "- O escribe una fecha (dd/mm/aaaa o yyyy-mm-dd).",
+        defaultValue
+    );
+
+    if (value === null) return null;
+
+    const normalized = String(value).trim();
+    if (!normalized) return {};
+
+    if (/^[+-]\d+$/.test(normalized)) {
+        return { fecha_offset: Number(normalized) };
+    }
+
+    return { fecha: normalized };
+}
+
 function effectiveVacationYearForPdf(tab){
     if (tab === 'vacaciones') return safeYear(AUS.bucketYear);
     return safeYear(CAL.year);
@@ -675,12 +698,16 @@ function renderVacPdfButtons() {
         const year = effectiveVacationYearForPdf('vacaciones'); // ✅ AUS.bucketYear
         if (!wid || !year) return;
 
+        const dateParams = promptPdfDateValue();
+        if (dateParams === null) return;
+
         const rawBase = String(window.APP?.routes?.pdfVac ?? "");
         const urlBase = rawBase.replace("__ID__", wid);
 
         const finalUrl = buildSafeAppUrl(urlBase, {
             vacation_year: year,
             tipo: "V",
+            ...dateParams,
         });
 
         if (!finalUrl) return;
@@ -754,12 +781,16 @@ function renderPerPdfButtons() {
         const year = effectiveVacationYearForPdf('permiso'); // ✅ CAL.year
         if (!wid || !year) return;
 
+        const dateParams = promptPdfDateValue();
+        if (dateParams === null) return;
+
         const rawBase = String(window.APP?.routes?.pdfPer ?? "");
         const urlBase = rawBase.replace("__ID__", wid);
 
         const finalUrl = buildSafeAppUrl(urlBase, {
             vacation_year: year,
             tipo: "P",
+            ...dateParams,
         });
 
         if (!finalUrl) return;
@@ -833,12 +864,16 @@ function renderBajPdfButtons() {
         const year = effectiveVacationYearForPdf('baja'); // ✅ CAL.year
         if (!wid || !year) return;
 
+        const dateParams = promptPdfDateValue();
+        if (dateParams === null) return;
+
         const rawBase = String(window.APP?.routes?.pdfBaj ?? "");
         const urlBase = rawBase.replace("__ID__", wid);
 
         const finalUrl = buildSafeAppUrl(urlBase, {
             vacation_year: year,
             tipo: "B",
+            ...dateParams,
         });
 
         if (!finalUrl) return;
