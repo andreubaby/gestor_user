@@ -149,6 +149,15 @@ Configura en `.env` todas las conexiones MySQL necesarias.
 
 ---
 
+## 📚 Documentacion tecnica y API
+
+* Documentacion tecnica completa: `docs/PROJECT_DOCUMENTATION.md`
+* OpenAPI (Swagger): `docs/openapi.yaml`
+* Guia de uso Swagger: `docs/SWAGGER_USAGE.md`
+* Swagger integrado en app (auth): `/api/docs`
+
+---
+
 ## 🚀 Uso recomendado
 
 1. Importar usuarios y trabajadores existentes

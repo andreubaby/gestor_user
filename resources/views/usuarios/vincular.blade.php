@@ -73,6 +73,7 @@
         request()->routeIs('rrhh.*')                => 'rrhh',
         request()->routeIs('groups.assign.*')       => 'asignar',
         request()->routeIs('tacografo.*')           => 'tacografo',
+        request()->routeIs('maria-app')             => 'maria-app',
         default => '',
     };
 
@@ -118,16 +119,10 @@
         <nav class="flex items-center gap-3">
             {{-- Tabs izquierda --}}
             <div class="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-1 shadow-sm">
-            <span class="text-[10px] text-slate-500 px-2">
-                name: {{ request()->route()?->getName() ?? '—' }}
-                | uri: {{ request()->route()?->uri() ?? '—' }}
-                | path: {{ request()->path() }}
-                | active: {{ $active ?? '—' }}
-            </span>
                 {{-- Listado --}}
                 <a href="{{ route('usuarios.index') }}"
                    class="{{ $tabBase }} {{ $active==='usuarios' ? $tabActive : $tabIdle }}">
-                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='usuarios' ? 'bg-white/15' : 'bg-slate-100' }}">👤</span>
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='usuarios' ? 'bg-white/15' : 'bg-slate-100' }}"></span>
                     Listado
                 </a>
 
@@ -141,16 +136,30 @@
                 {{-- Onboarding --}}
                 <a href="{{ route('usuarios.onboarding.create') }}"
                    class="{{ $tabBase }} {{ $active==='onboarding' ? $tabActive : $tabIdle }}">
-                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='onboarding' ? 'bg-white/15' : 'bg-slate-100' }}">🧾</span>
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='onboarding' ? 'bg-white/15' : 'bg-slate-100' }}"></span>
                     Onboarding
+                </a>
+
+                {{-- Vincular (acceso directo) --}}
+                <a href="{{ route('usuarios.vincular') }}"
+                   class="{{ $tabBase }} {{ $active==='vincular' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='vincular' ? 'bg-white/15' : 'bg-slate-100' }}"></span>
+                    Vincular
+                </a>
+
+                {{-- RRHH (acceso directo) --}}
+                <a href="{{ route('rrhh.documentos.index') }}"
+                   class="{{ $tabBase }} {{ $active==='rrhh' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='rrhh' ? 'bg-white/15' : 'bg-slate-100' }}"></span>
+                    RRHH
                 </a>
 
                 {{-- Dropdown Más --}}
                 <div class="relative group">
                     <button type="button"
-                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? $tabActive : $tabIdle }}
+                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','asignar','tacografo','maria-app']) ? $tabActive : $tabIdle }}
                            inline-flex items-center gap-2">
-                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
+                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','asignar','tacografo','maria-app']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
                         Más
                         <span class="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-slate-700 transition
                              group-hover:bg-emerald-100 group-hover:text-emerald-800">
@@ -172,7 +181,7 @@
                             <a href="{{ route('gestor.gestoria') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='dashboard' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">🏠</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">Dashboard</div>
                                     <div class="text-xs text-slate-500">Vista general</div>
@@ -185,7 +194,7 @@
                             <a href="{{ route('rrhh.documentos.index') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='rrhh' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-sky-50 ring-1 ring-sky-100">📁</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-sky-50 ring-1 ring-sky-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">RRHH</div>
                                     <div class="text-xs text-slate-500">Documentos</div>
@@ -196,7 +205,7 @@
                             <a href="{{ route('usuarios.vincular') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='vincular' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">🔗</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">Vincular</div>
                                     <div class="text-xs text-slate-500">Unificar cuentas</div>
@@ -207,7 +216,7 @@
                             <a href="{{ route('groups.assign.create') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='asignar' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-violet-50 ring-1 ring-violet-100">👥</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-violet-50 ring-1 ring-violet-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">Asignar grupo</div>
                                     <div class="text-xs text-slate-500">Gestión de grupos</div>
@@ -218,7 +227,7 @@
                             <a href="{{ route('tacografo.index') }}"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='tacografo' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-amber-50 ring-1 ring-amber-100">🚚</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-amber-50 ring-1 ring-amber-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">Tacógrafo</div>
                                     <div class="text-xs text-slate-500">Camión / Camionero</div>
@@ -229,7 +238,7 @@
                             <a href="/maria-app/"
                                class="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition
                               {{ $active==='maria-app' ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-900' }}">
-                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-pink-50 ring-1 ring-pink-100">🌸</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-2xl bg-pink-50 ring-1 ring-pink-100"></span>
                                 <div class="leading-tight">
                                     <div class="font-semibold">Maria App</div>
                                     <div class="text-xs text-slate-500">Aplicación María</div>
@@ -346,6 +355,7 @@
             @if($vinculo) @method($method) @endif
 
             <input type="hidden" name="uuid" value="{{ $uuidActual }}">
+            <input type="hidden" name="continue_workflow" id="continueWorkflow" value="0">
 
             {{-- Buscador por email --}}
             <div class="rounded-2xl ring-1 ring-emerald-100 bg-white p-4 md:p-5 shadow-sm">
@@ -392,12 +402,56 @@
                         </button>
 
                         <button type="button"
+                                id="suggestLinkingBtn"
+                                onclick="suggestLinking({ force: true })"
+                                class="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition
+                                       focus:outline-none focus:ring-4 focus:ring-blue-200 shadow">
+                            Sugerir
+                        </button>
+
+                        <button type="button"
                                 onclick="document.getElementById('emailSearch').value='';"
                                 class="px-4 py-2.5 rounded-xl bg-white ring-1 ring-slate-200 text-slate-700 font-semibold hover:bg-slate-50 transition
                                        focus:outline-none focus:ring-4 focus:ring-slate-300/40">
                             Vaciar
                         </button>
                     </div>
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 ring-1 ring-slate-200 px-3 py-2 text-xs">
+                    <label class="inline-flex items-center gap-2 font-semibold text-slate-700">
+                        <input id="safeOnlyToggle" type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        Aplicar solo coincidencias seguras
+                    </label>
+
+                    <label class="inline-flex items-center gap-2 text-slate-600">
+                        Score minimo
+                        <select id="minScoreSelect" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs">
+                            <option value="60">60</option>
+                            <option value="70" selected>70</option>
+                            <option value="80">80</option>
+                            <option value="90">90</option>
+                        </select>
+                    </label>
+
+                    <button
+                        type="button"
+                        id="applyUnsafeSuggestionBtn"
+                        onclick="applyCurrentSuggestion()"
+                        class="hidden rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 transition"
+                    >
+                        Aplicar sugerencia de todos modos
+                    </button>
+                </div>
+
+                <div id="suggestionResult" class="mt-3 hidden rounded-xl bg-blue-50 ring-1 ring-blue-200 px-3 py-2 text-sm text-blue-900"></div>
+
+                <div id="suggestionDetails" class="mt-3 hidden rounded-xl bg-slate-50 ring-1 ring-slate-200 p-3">
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-xs font-semibold uppercase text-slate-600">Detalle de coincidencias por sistema</p>
+                        <span id="suggestionMeta" class="text-xs text-slate-500"></span>
+                    </div>
+                    <div id="suggestionDetailsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"></div>
                 </div>
             </div>
 
@@ -546,7 +600,7 @@
                 </section>
             </div>
 
-            <div class="flex items-center justify-end gap-2 pt-2">
+            <div class="sticky bottom-3 z-20 flex items-center justify-end gap-2 pt-2 rounded-2xl bg-white/95 backdrop-blur px-3 py-3 ring-1 ring-emerald-100 shadow-soft">
                 <a href="{{ route('usuarios.vincular') }}"
                    class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-800 hover:bg-slate-200 transition font-semibold
                           focus:outline-none focus:ring-4 focus:ring-slate-300/40">
@@ -554,9 +608,17 @@
                 </a>
 
                 <button type="submit"
+                        onclick="document.getElementById('continueWorkflow').value='0'"
                         class="px-6 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition font-semibold shadow
                                focus:outline-none focus:ring-4 focus:ring-emerald-200">
                     {{ $vinculo ? 'Actualizar vinculación' : 'Guardar vinculación' }}
+                </button>
+
+                <button type="submit"
+                        onclick="document.getElementById('continueWorkflow').value='1'"
+                        class="px-6 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition font-semibold shadow
+                               focus:outline-none focus:ring-4 focus:ring-blue-200">
+                    {{ $vinculo ? 'Actualizar y siguiente' : 'Guardar y siguiente' }}
                 </button>
             </div>
         </form>
@@ -565,6 +627,13 @@
 
 <script>
     const TS = new Map();
+    let autofillTimer = null;
+    let lastAutofillEmail = null;
+    let suggestionTimer = null;
+    let lastSuggestionKey = null;
+    let inFlightSuggestionKey = null;
+    let currentSuggestion = null;
+    const suggestionsEndpoint = @json(route('usuarios.vincular.suggestions'));
 
     function initTomSelect(){
         document.querySelectorAll('select.ts').forEach(sel => {
@@ -594,6 +663,10 @@
     function clearAll(){
         const email = document.getElementById('emailSearch');
         if (email) email.value = '';
+        lastAutofillEmail = null;
+        lastSuggestionKey = null;
+        inFlightSuggestionKey = null;
+        currentSuggestion = null;
 
         TS.forEach(t => t.clear(true));
 
@@ -604,7 +677,8 @@
     // ✅ Busca el option por data-email iterando (sin cssEscape)
     function autofillByEmail(email){
         email = (email || '').trim().toLowerCase();
-        if (!email) return;
+        if (!email || email === lastAutofillEmail) return;
+        lastAutofillEmail = email;
 
         document.querySelectorAll('select').forEach(sel => {
             let foundValue = null;
@@ -626,7 +700,237 @@
         });
     }
 
-    document.addEventListener('DOMContentLoaded', initTomSelect);
+    function scheduleAutofill(email, delay = 250){
+        clearTimeout(autofillTimer);
+        autofillTimer = setTimeout(() => autofillByEmail(email), delay);
+    }
+
+    function scheduleSuggestion(delay = 240){
+        clearTimeout(suggestionTimer);
+        suggestionTimer = setTimeout(() => suggestLinking(), delay);
+    }
+
+    function setSelectValue(selectName, value) {
+        if (!value) return;
+
+        const sel = document.querySelector(`select[name="${selectName}"]`);
+        if (!sel) return;
+
+        const key = sel.id || sel.name;
+        const ts = TS.get(key);
+        if (ts) {
+            ts.setValue(String(value), true);
+            return;
+        }
+
+        sel.value = String(value);
+    }
+
+    function getSuggestionSafetyConfig() {
+        const safeOnly = Boolean(document.getElementById('safeOnlyToggle')?.checked);
+        const minScore = Number(document.getElementById('minScoreSelect')?.value || 70);
+        return { safeOnly, minScore };
+    }
+
+    function toggleUnsafeApplyButton(visible) {
+        const btn = document.getElementById('applyUnsafeSuggestionBtn');
+        if (!btn) return;
+        btn.classList.toggle('hidden', !visible);
+    }
+
+    function applySuggestionToForm(suggestion) {
+        const ids = suggestion?.ids || {};
+        Object.entries(ids).forEach(([key, value]) => setSelectValue(key, value));
+
+        if (suggestion?.uuid) {
+            const uuidInput = document.querySelector('input[name="uuid"]');
+            if (uuidInput) uuidInput.value = suggestion.uuid;
+        }
+    }
+
+    function applyCurrentSuggestion() {
+        if (!currentSuggestion) return;
+        applySuggestionToForm(currentSuggestion);
+        toggleUnsafeApplyButton(false);
+        renderSuggestionResult(`Sugerencia aplicada manualmente. Score: ${currentSuggestion.score}/100.`, false);
+    }
+
+    function renderSuggestionResult(text, isError = false) {
+        const box = document.getElementById('suggestionResult');
+        if (!box) return;
+
+        box.classList.remove('hidden');
+        box.classList.toggle('bg-red-50', isError);
+        box.classList.toggle('ring-red-200', isError);
+        box.classList.toggle('text-red-900', isError);
+        box.classList.toggle('bg-blue-50', !isError);
+        box.classList.toggle('ring-blue-200', !isError);
+        box.classList.toggle('text-blue-900', !isError);
+        box.textContent = text;
+    }
+
+    function renderSuggestionDetails(suggestion) {
+        const wrapper = document.getElementById('suggestionDetails');
+        const grid = document.getElementById('suggestionDetailsGrid');
+        const meta = document.getElementById('suggestionMeta');
+
+        if (!wrapper || !grid || !meta) return;
+
+        if (!suggestion || typeof suggestion !== 'object') {
+            wrapper.classList.add('hidden');
+            grid.innerHTML = '';
+            meta.textContent = '';
+            return;
+        }
+
+        const ids = suggestion.ids || {};
+        const systems = [
+            ['usuario_id', 'App Base'],
+            ['trabajador_id', 'Polifonia'],
+            ['pluton_id', 'Pluton'],
+            ['user_buscador_id', 'Buscador User'],
+            ['worker_buscador_id', 'Buscador Worker'],
+            ['user_cronos_id', 'Cronos'],
+            ['user_semillas_id', 'Semillas'],
+            ['user_store_id', 'Store'],
+            ['user_zeus_id', 'Zeus'],
+            ['user_fichaje_id', 'Fichajes'],
+        ];
+
+        meta.textContent = `Score ${suggestion.score ?? 0}/100 · ${suggestion.linked_uuid_found ? 'UUID vinculado detectado' : 'Sin UUID previo'}`;
+
+        grid.innerHTML = systems.map(([key, label]) => {
+            const value = ids[key];
+            const matched = value !== null && value !== undefined && value !== '';
+            const cardClasses = matched
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-600';
+            const badgeClasses = matched
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-slate-100 text-slate-500';
+            const badgeText = matched ? `ID ${value}` : 'Sin coincidencia';
+
+            return `
+                <div class="rounded-lg border px-3 py-2 ${cardClasses}">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold uppercase">${label}</p>
+                        <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClasses}">${badgeText}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        wrapper.classList.remove('hidden');
+    }
+
+    async function suggestLinking(options = {}) {
+        const force = Boolean(options.force);
+        const email = (document.getElementById('emailSearch')?.value || '').trim();
+        const uuid = (document.querySelector('input[name="uuid"]')?.value || '').trim();
+        const btn = document.getElementById('suggestLinkingBtn');
+        const normalizedEmail = email.toLowerCase();
+        const key = `${normalizedEmail}|${uuid}`;
+
+        if (!email && !uuid) {
+            renderSuggestionResult('Indica un email o UUID para sugerir una vinculación.', true);
+            return;
+        }
+
+        if (!force && (key === lastSuggestionKey || key === inFlightSuggestionKey)) {
+            return;
+        }
+
+        inFlightSuggestionKey = key;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Buscando...';
+        }
+
+        try {
+            const params = new URLSearchParams();
+            if (email) params.set('email', email);
+            if (uuid) params.set('uuid', uuid);
+
+            const response = await fetch(`${suggestionsEndpoint}?${params.toString()}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+
+            if (!response.ok) {
+                throw new Error('No se pudieron cargar sugerencias');
+            }
+
+            const payload = await response.json();
+            lastSuggestionKey = key;
+            const suggestion = payload?.suggestion;
+            currentSuggestion = suggestion || null;
+            if (!suggestion) {
+                renderSuggestionResult('No hay sugerencias para los datos indicados.', true);
+                renderSuggestionDetails(null);
+                toggleUnsafeApplyButton(false);
+                return;
+            }
+
+            const score = Number(suggestion.score || 0);
+            const { safeOnly, minScore } = getSuggestionSafetyConfig();
+            const canAutoApply = !safeOnly || score >= minScore;
+
+            if (canAutoApply) {
+                applySuggestionToForm(suggestion);
+                toggleUnsafeApplyButton(false);
+                renderSuggestionResult(`Sugerencia aplicada. Score: ${score}/100 · sistemas vinculados: ${suggestion.matched_systems}.`);
+            } else {
+                toggleUnsafeApplyButton(true);
+                renderSuggestionResult(`Sugerencia detectada con score ${score}/100 (umbral ${minScore}). Revisa y aplica manualmente si procede.`, true);
+            }
+
+            renderSuggestionDetails(suggestion);
+        } catch (error) {
+            currentSuggestion = null;
+            renderSuggestionResult('Error al sugerir vinculación. Inténtalo de nuevo.', true);
+            renderSuggestionDetails(null);
+            toggleUnsafeApplyButton(false);
+        } finally {
+            inFlightSuggestionKey = null;
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Sugerir';
+            }
+        }
+    }
+
+    function initEmailAutofill(){
+        const input = document.getElementById('emailSearch');
+        if (!input) return;
+
+        input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            autofillByEmail(input.value);
+            suggestLinking();
+        });
+
+        input.addEventListener('input', () => {
+            scheduleAutofill(input.value, 220);
+            scheduleSuggestion(300);
+        });
+
+        input.addEventListener('blur', () => {
+            scheduleAutofill(input.value, 80);
+            scheduleSuggestion(120);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initTomSelect();
+        initEmailAutofill();
+
+        const prefilledEmail = (document.getElementById('emailSearch')?.value || '').trim();
+        if (prefilledEmail) {
+            scheduleAutofill(prefilledEmail, 80);
+            scheduleSuggestion(100);
+        }
+    });
 </script>
 
 </body>

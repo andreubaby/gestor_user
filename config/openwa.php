@@ -56,6 +56,12 @@ return [
     */
     'webhook_secret' => env('OPENWA_WEBHOOK_SECRET', null),
 
+    // Controla ventana de deduplicación para webhooks procesados.
+    'webhook_idempotency_ttl_seconds' => (int) env('OPENWA_WEBHOOK_IDEMPOTENCY_TTL_SECONDS', 86400),
+
+    // Límite de peticiones por minuto para endpoints webhook.
+    'webhook_throttle_per_minute' => (int) env('OPENWA_WEBHOOK_THROTTLE_PER_MINUTE', 120),
+
     /*
     |--------------------------------------------------------------------------
     | Request Timeout
