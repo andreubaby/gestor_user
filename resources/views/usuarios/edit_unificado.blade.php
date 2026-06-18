@@ -8,7 +8,6 @@
     <meta name="referrer" content="strict-origin-when-cross-origin">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
     <script>
         tailwind.config = {
@@ -40,10 +39,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans&display=swap" rel="stylesheet">
 
     <style>
-        .ry-6 { transform: translateX(-16rem) scale(.92) rotateY(8deg); }
-        .ry--6 { transform: translateX(16rem) scale(.92) rotateY(-8deg); }
-        .card-base { will-change: transform, opacity; }
-        .glass { background: rgba(255,255,255,.80); backdrop-filter: blur(10px); }
+        .section-anchor {
+            scroll-margin-top: 110px;
+        }
     </style>
 </head>
 
@@ -58,6 +56,7 @@
         request()->routeIs('rrhh.*') => 'rrhh',
         request()->routeIs('groups.assign.*') => 'asignar',
         request()->routeIs('tacografo.*') => 'tacografo',
+        request()->routeIs('maria-app') => 'maria-app',
         default => '',
     };
 
@@ -122,12 +121,26 @@
                     Onboarding
                 </a>
 
+                {{-- Vincular (acceso directo) --}}
+                <a href="{{ route('usuarios.vincular') }}"
+                   class="{{ $tabBase }} {{ $active==='vincular' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='vincular' ? 'bg-white/15' : 'bg-slate-100' }}">🔗</span>
+                    Vincular
+                </a>
+
+                {{-- RRHH (acceso directo) --}}
+                <a href="{{ route('rrhh.documentos.index') }}"
+                   class="{{ $tabBase }} {{ $active==='rrhh' ? $tabActive : $tabIdle }}">
+                    <span class="grid h-7 w-7 place-items-center rounded-full {{ $active==='rrhh' ? 'bg-white/15' : 'bg-slate-100' }}">📁</span>
+                    RRHH
+                </a>
+
                 {{-- Dropdown Más --}}
                 <div class="relative group">
                     <button type="button"
-                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? $tabActive : $tabIdle }}
+                            class="{{ $tabBase }} {{ in_array($active, ['dashboard','asignar','tacografo','maria-app']) ? $tabActive : $tabIdle }}
                            inline-flex items-center gap-2">
-                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','rrhh','vincular','asignar','tacografo']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
+                        <span class="grid h-7 w-7 place-items-center rounded-full {{ in_array($active, ['dashboard','asignar','tacografo','maria-app']) ? 'bg-white/15' : 'bg-slate-100' }}">⋯</span>
                         Más
                         <span class="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-slate-700 transition
                              group-hover:bg-emerald-100 group-hover:text-emerald-800">
@@ -333,12 +346,7 @@
     }
 @endphp
 
-<div class="relative max-w-7xl mx-auto px-4 py-6"
-     x-data="carousel()"
-     x-init="init"
-     @keydown.window.arrow-right.prevent="next()"
-     @keydown.window.arrow-left.prevent="prev()"
-     @keydown.window.escape.prevent="goBack()">
+<div id="top" class="relative max-w-7xl mx-auto px-4 py-6">
 
     <div class="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -373,117 +381,50 @@
         </div>
     </div>
 
-    <div class="mt-5 flex items-center gap-2 flex-wrap">
-        <template x-for="(item, i) in items" :key="i">
-            <button type="button"
-                    @click="jump(i)"
-                    class="px-3 py-1.5 rounded-full text-xs font-semibold ring-1 transition
-                           focus:outline-none focus:ring-4"
-                    :class="i===current
-                        ? 'bg-emerald-600 text-white ring-emerald-600 focus:ring-emerald-200'
-                        : 'bg-white/80 text-slate-700 ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200 focus:ring-slate-200'">
-                <span x-text="item.label"></span>
-            </button>
-        </template>
-    </div>
-
-    <div class="mt-6 relative flex items-center justify-center h-[560px] overflow-hidden rounded-3xl ring-1 ring-emerald-100 bg-white/60 backdrop-blur shadow-soft">
-
-        <template x-for="(item, index) in items" :key="index">
-            <div class="card-base absolute w-[360px] sm:w-[420px] h-[500px] rounded-2xl ring-1 bg-white shadow-xl p-6 overflow-y-auto transition-all duration-700"
-                 :class="cardClass(index)">
-
-                <div class="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                        <div class="text-xs font-semibold text-slate-500">Módulo</div>
-                        <h3 class="text-xl font-semibold tracking-tight"
-                            :class="'text-' + item.color"
-                            x-text="item.label"></h3>
-                    </div>
-
-                    <div class="inline-flex items-center gap-2">
-                        <span class="h-2.5 w-2.5 rounded-full"
-                              :class="'bg-' + item.color"></span>
-                        <span class="text-xs font-semibold text-slate-500"
-                              x-text="(current+1) + ' / ' + items.length"></span>
-                    </div>
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <aside class="lg:col-span-4 xl:col-span-3">
+            <div class="sticky top-24 rounded-2xl bg-white ring-1 ring-emerald-100 p-4 shadow-soft">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Módulos disponibles</p>
+                <div class="mt-3 space-y-2">
+                    @forelse($items as $index => $item)
+                        <a href="#section-{{ $index }}"
+                           class="flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-900 hover:ring-emerald-200 transition">
+                            <span>{{ $item['label'] }}</span>
+                            <span class="text-xs text-slate-400">{{ $index + 1 }}</span>
+                        </a>
+                    @empty
+                        <p class="text-sm text-slate-500">No hay registros para mostrar.</p>
+                    @endforelse
                 </div>
-
-                <div class="border-t border-slate-100 pt-4" x-html="item.html"></div>
             </div>
-        </template>
+        </aside>
 
-        <div class="absolute left-4 top-1/2 -translate-y-1/2">
-            <button @click="prev"
-                    class="h-11 w-11 rounded-full bg-white ring-1 ring-slate-200 shadow hover:bg-emerald-50 hover:ring-emerald-200 transition
-                           text-slate-700 font-bold focus:outline-none focus:ring-4 focus:ring-emerald-200"
-                    aria-label="Anterior">
-                ‹
-            </button>
-        </div>
+        <section class="lg:col-span-8 xl:col-span-9 space-y-5">
+            @forelse($items as $index => $item)
+                <article id="section-{{ $index }}" class="section-anchor rounded-2xl bg-white ring-1 ring-emerald-100 shadow-soft overflow-hidden">
+                    <header class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 bg-emerald-50/60">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Módulo {{ $index + 1 }}</p>
+                            <h3 class="text-lg font-semibold text-slate-900">{{ $item['label'] }}</h3>
+                        </div>
+                        <a href="#top"
+                           class="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+                            Ir arriba
+                        </a>
+                    </header>
 
-        <div class="absolute right-4 top-1/2 -translate-y-1/2">
-            <button @click="next"
-                    class="h-11 w-11 rounded-full bg-white ring-1 ring-slate-200 shadow hover:bg-emerald-50 hover:ring-emerald-200 transition
-                           text-slate-700 font-bold focus:outline-none focus:ring-4 focus:ring-emerald-200"
-                    aria-label="Siguiente">
-                ›
-            </button>
-        </div>
+                    <div class="p-5">
+                        {!! $item['html'] !!}
+                    </div>
+                </article>
+            @empty
+                <article class="rounded-2xl bg-white ring-1 ring-emerald-100 p-5 shadow-soft">
+                    <p class="text-sm text-slate-600">No hay registros para mostrar.</p>
+                </article>
+            @endforelse
+        </section>
     </div>
-
-    <p class="text-center mt-6 text-xs text-slate-500">
-        Atajos: <span class="font-semibold">←</span> anterior · <span class="font-semibold">→</span> siguiente · <span class="font-semibold">ESC</span> volver
-    </p>
 </div>
-
-<script>
-    function carousel() {
-        return {
-            current: 0,
-            items: @json($items),
-
-            init() {
-                if (!this.items.length) {
-                    this.items = [{
-                        label: 'Sin datos',
-                        color: 'primary',
-                        html: '<p class="text-sm text-slate-600">No hay registros para mostrar.</p>'
-                    }];
-                }
-            },
-
-            next() { this.current = (this.current + 1) % this.items.length; },
-            prev() { this.current = (this.current - 1 + this.items.length) % this.items.length; },
-            jump(i) { this.current = i; },
-
-            goBack() {
-                window.location.href = @json(route('usuarios.index'));
-            },
-
-            cardClass(index) {
-                const offset = index - this.current;
-
-                const n = this.items.length;
-                let o = offset;
-                if (o >  n/2) o -= n;
-                if (o < -n/2) o += n;
-
-                const base = "ring-slate-200";
-
-                if (o === 0) {
-                    return `${base} z-30 opacity-100 translate-x-0 scale-100`;
-                } else if (o === -1) {
-                    return `${base} z-20 opacity-100 ry-6`;
-                } else if (o === 1) {
-                    return `${base} z-20 opacity-100 ry--6`;
-                } else {
-                    return `${base} z-10 opacity-0 pointer-events-none translate-x-0 scale-75`;
-                }
-            }
-        };
-    }
-</script>
 
 </body>
 </html>

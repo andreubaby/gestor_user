@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\WhatsappMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -16,15 +17,13 @@ use Illuminate\Support\Facades\Log;
 class OpenWAWebhookController extends Controller
 {
     /**
-     * Eventos procesados para idempotencia
-     */
-    protected static array $processedEvents = [];
-
-    /**
      * Manejar webhook de OpenWA
      */
     public function handle(Request $request): JsonResponse
     {
+        $eventId = null;
+        $markedAsProcessed = false;
+
         try {
             // Validar firma HMAC si está configurada
             if (!$this->validateHmac($request)) {
@@ -36,13 +35,11 @@ class OpenWAWebhookController extends Controller
             $eventId = $event['idempotencyKey'] ?? $event['deliveryId'] ?? sha1(json_encode($event));
 
             // Verificar idempotencia
-            if ($this->isProcessed($eventId)) {
+            if (!$this->markAsProcessed($eventId)) {
                 Log::channel('openwa')->debug('Webhook already processed', ['event_id' => $eventId]);
                 return response()->json(['ok' => true, 'message' => 'Already processed']);
             }
-
-            // Marcar como procesado
-            $this->markAsProcessed($eventId);
+            $markedAsProcessed = true;
 
             Log::channel('openwa')->info('Webhook received', [
                 'type' => $event['event'] ?? $event['type'] ?? 'unknown',
@@ -63,6 +60,11 @@ class OpenWAWebhookController extends Controller
 
             return response()->json(['ok' => true]);
         } catch (\Exception $e) {
+            if ($markedAsProcessed && $eventId) {
+                // Si falló el procesamiento liberamos la clave para permitir reintento.
+                Cache::forget($this->processedKey($eventId));
+            }
+
             Log::channel('openwa')->error('Webhook processing error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -239,19 +241,23 @@ class OpenWAWebhookController extends Controller
      */
     protected function isProcessed(string $eventId): bool
     {
-        // En producción, usar Redis o DB para persistencia
-        // Redis::exists("openwa.webhook.{$eventId}")
-        return isset(static::$processedEvents[$eventId]);
+        return Cache::has($this->processedKey($eventId));
     }
 
     /**
      * Marcar evento como procesado
      */
-    protected function markAsProcessed(string $eventId): void
+    protected function markAsProcessed(string $eventId): bool
     {
-        // En producción, usar Redis o DB
-        // Redis::setex("openwa.webhook.{$eventId}", 86400, true);
-        static::$processedEvents[$eventId] = true;
+        $ttlSeconds = max(60, (int) config('openwa.webhook_idempotency_ttl_seconds', 86400));
+
+        // add() es atómico y evita condición de carrera entre workers.
+        return Cache::add($this->processedKey($eventId), true, now()->addSeconds($ttlSeconds));
+    }
+
+    protected function processedKey(string $eventId): string
+    {
+        return 'openwa.webhook.processed.' . $eventId;
     }
 }
 

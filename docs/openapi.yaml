@@ -1,0 +1,718 @@
+openapi: 3.0.3
+info:
+  title: Gestor Usuarios API
+  version: 1.0.0
+  description: |
+    OpenAPI para endpoints API de TimeGuard y webhooks OpenWA.
+    Base calculada desde routes/api.php y controladores actuales.
+servers:
+  - url: http://localhost:8077
+    description: Local Docker
+  - url: http://172.16.0.7:8077
+    description: LAN example
+
+tags:
+  - name: TimeGuard
+    description: API para gestion de workers, entries y compensations
+  - name: OpenWA Webhooks
+    description: Recepcion de eventos webhook de OpenWA
+
+paths:
+  /api/timeguard/workers:
+    get:
+      tags: [TimeGuard]
+      summary: List workers
+      operationId: listTimeguardWorkers
+      responses:
+        '200':
+          description: Lista de workers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeguardWorker'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [TimeGuard]
+      summary: Create worker
+      operationId: createTimeguardWorker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardWorkerCreateRequest'
+      responses:
+        '201':
+          description: Worker creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardWorker'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/workers/{id}:
+    put:
+      tags: [TimeGuard]
+      summary: Update worker
+      operationId: updateTimeguardWorker
+      parameters:
+        - $ref: '#/components/parameters/WorkerIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardWorkerUpdateRequest'
+      responses:
+        '200':
+          description: Worker actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardWorker'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [TimeGuard]
+      summary: Delete worker
+      operationId: deleteTimeguardWorker
+      parameters:
+        - $ref: '#/components/parameters/WorkerIdPath'
+      responses:
+        '200':
+          description: Worker eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/entries:
+    get:
+      tags: [TimeGuard]
+      summary: List entries
+      operationId: listTimeguardEntries
+      parameters:
+        - in: query
+          name: worker_id
+          required: false
+          schema:
+            type: string
+          description: Worker id usado para filtrar por `worker_id`.
+      responses:
+        '200':
+          description: Lista de entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeguardEntry'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [TimeGuard]
+      summary: Create entry
+      operationId: createTimeguardEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardEntryCreateRequest'
+      responses:
+        '201':
+          description: Entry creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardEntry'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/entries/{id}:
+    put:
+      tags: [TimeGuard]
+      summary: Update entry
+      operationId: updateTimeguardEntry
+      parameters:
+        - $ref: '#/components/parameters/EntryIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardEntryUpdateRequest'
+      responses:
+        '200':
+          description: Entry actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardEntry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags: [TimeGuard]
+      summary: Delete entry
+      operationId: deleteTimeguardEntry
+      parameters:
+        - $ref: '#/components/parameters/EntryIdPath'
+      responses:
+        '200':
+          description: Entry eliminada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/compensations:
+    get:
+      tags: [TimeGuard]
+      summary: List compensations
+      operationId: listTimeguardCompensations
+      parameters:
+        - in: query
+          name: worker_id
+          required: false
+          schema:
+            type: string
+          description: Worker id usado para filtrar por `worker_id`.
+      responses:
+        '200':
+          description: Lista de compensations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeguardCompensation'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [TimeGuard]
+      summary: Create compensation
+      operationId: createTimeguardCompensation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardCompensationCreateRequest'
+      responses:
+        '201':
+          description: Compensation creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardCompensation'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/compensations/{id}:
+    delete:
+      tags: [TimeGuard]
+      summary: Delete compensation
+      operationId: deleteTimeguardCompensation
+      parameters:
+        - $ref: '#/components/parameters/CompensationIdPath'
+      responses:
+        '200':
+          description: Compensation eliminada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/timeguard/import:
+    post:
+      tags: [TimeGuard]
+      summary: Bulk import from local storage data
+      operationId: importTimeguardData
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimeguardImportRequest'
+      responses:
+        '200':
+          description: Import completado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimeguardImportResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/webhooks/openwa:
+    post:
+      tags: [OpenWA Webhooks]
+      summary: Receive OpenWA webhook
+      operationId: receiveOpenwaWebhook
+      description: |
+        Endpoint webhook principal.
+        - No usa CSRF.
+        - Usa throttle `openwa-webhook`.
+        - Si `OPENWA_WEBHOOK_SECRET` esta definido, requiere firma HMAC SHA256 en `X-HMAC-SHA256`.
+      parameters:
+        - $ref: '#/components/parameters/HmacHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenwaWebhookEvent'
+      responses:
+        '200':
+          description: Evento procesado o ya procesado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenwaWebhookOkResponse'
+        '401':
+          description: Firma invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Invalid signature
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Error interno durante procesamiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Processing error
+
+  /api/webhook/openwa:
+    post:
+      tags: [OpenWA Webhooks]
+      summary: Receive OpenWA webhook (legacy alias)
+      operationId: receiveOpenwaWebhookLegacy
+      parameters:
+        - $ref: '#/components/parameters/HmacHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenwaWebhookEvent'
+      responses:
+        '200':
+          description: Evento procesado o ya procesado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenwaWebhookOkResponse'
+        '401':
+          description: Firma invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    WorkerIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    EntryIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    CompensationIdPath:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+    HmacHeader:
+      in: header
+      name: X-HMAC-SHA256
+      required: false
+      schema:
+        type: string
+      description: Firma HMAC SHA256 del payload crudo. Requerida si el secreto esta habilitado.
+
+  responses:
+    ValidationError:
+      description: Error de validacion
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+    TooManyRequests:
+      description: Rate limit excedido
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Too Many Attempts.
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    TimeguardWorker:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 255
+        isActive:
+          type: boolean
+      required: [id, name, isActive]
+
+    TimeguardWorkerCreateRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 255
+        isActive:
+          type: boolean
+          default: true
+      required: [id, name]
+
+    TimeguardWorkerUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        isActive:
+          type: boolean
+
+    TimeguardAuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        field:
+          type: string
+        oldValue:
+          type: string
+          nullable: true
+        newValue:
+          type: string
+          nullable: true
+        user:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+      required: [id, timestamp, field]
+
+    TimeguardEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        workerId:
+          type: string
+        date:
+          type: string
+          format: date
+        hoursBrutas:
+          type: integer
+          minimum: 0
+        lunchDiscount:
+          type: integer
+          minimum: 0
+        isLunchManual:
+          type: boolean
+        isFreeDay:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeguardAuditLog'
+      required: [id, workerId, date, hoursBrutas, lunchDiscount, isLunchManual, isFreeDay, logs]
+
+    TimeguardEntryCreateRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        workerId:
+          type: string
+        date:
+          type: string
+          format: date
+        hoursBrutas:
+          type: integer
+          minimum: 0
+        lunchDiscount:
+          type: integer
+          minimum: 0
+        isLunchManual:
+          type: boolean
+        isFreeDay:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeguardAuditLog'
+      required: [id, workerId, date, hoursBrutas, lunchDiscount]
+
+    TimeguardEntryUpdateRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        hoursBrutas:
+          type: integer
+          minimum: 0
+        lunchDiscount:
+          type: integer
+          minimum: 0
+        isLunchManual:
+          type: boolean
+        isFreeDay:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+
+    TimeguardCompensation:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        workerId:
+          type: string
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [PAYMENT, REST_HOURS, FREE_DAY]
+        minutes:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+          nullable: true
+      required: [id, workerId, date, type, minutes]
+
+    TimeguardCompensationCreateRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 100
+        workerId:
+          type: string
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [PAYMENT, REST_HOURS, FREE_DAY]
+        minutes:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+          nullable: true
+      required: [id, workerId, date, type, minutes]
+
+    TimeguardImportRequest:
+      type: object
+      properties:
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeguardWorkerCreateRequest'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeguardEntryCreateRequest'
+        compensations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeguardCompensationCreateRequest'
+      required: [workers, entries, compensations]
+
+    TimeguardImportResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        imported:
+          type: object
+          properties:
+            workers:
+              type: integer
+            entries:
+              type: integer
+            compensations:
+              type: integer
+          required: [workers, entries, compensations]
+      required: [ok, imported]
+
+    OpenwaMessagePayload:
+      type: object
+      properties:
+        id:
+          type: string
+        _id:
+          type: string
+        from:
+          type: string
+        chatId:
+          type: string
+        body:
+          type: string
+        text:
+          type: string
+        isGroupMsg:
+          type: boolean
+        isSentByMe:
+          type: boolean
+
+    OpenwaWebhookEvent:
+      type: object
+      properties:
+        event:
+          type: string
+          description: message.received | session.status | session.qr | session.disconnected | message.status
+        type:
+          type: string
+          description: Alias alternativo a `event`
+        idempotencyKey:
+          type: string
+        deliveryId:
+          type: string
+        session:
+          type: string
+        sessionId:
+          type: string
+        status:
+          type: string
+        state:
+          type: string
+        qr:
+          type: string
+        messageId:
+          type: string
+        error:
+          type: string
+        message:
+          $ref: '#/components/schemas/OpenwaMessagePayload'
+        data:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+
+    OpenwaWebhookOkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        message:
+          type: string
+          nullable: true
+          example: Already processed
+      required: [ok]
+

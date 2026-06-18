@@ -18,12 +18,29 @@ class TrabajadoresIndexService
 
     public function handle(Request $request): array
     {
-        $search = $request->input('search');
-        $activo = $request->input('activo');         // '' | '1' | '0'
-        $sort   = $request->input('sort', 'nombre'); // nombre|email|activo|vinculado
-        $dir    = $request->input('dir', 'asc');     // asc|desc
-        $year   = (int) $request->input('vacation_year', date('Y'));
-        $grupo  = $request->input('grupo');
+        if ($request->boolean('reset_filters')) {
+            $request->session()->forget('usuarios.index.filters');
+        }
+
+        $filterSessionKey = 'usuarios.index.filters';
+        $hasFilterInput = $request->hasAny(['search', 'activo', 'sort', 'dir', 'vacation_year', 'grupo']);
+        $storedFilters = (array) $request->session()->get($filterSessionKey, []);
+
+        $search = $hasFilterInput ? $request->input('search') : ($storedFilters['search'] ?? null);
+        $activo = $hasFilterInput ? $request->input('activo') : ($storedFilters['activo'] ?? null); // '' | '1' | '0'
+        $sort   = (string) ($hasFilterInput ? $request->input('sort', 'nombre') : ($storedFilters['sort'] ?? 'nombre')); // nombre|email|activo|vinculado
+        $dir    = (string) ($hasFilterInput ? $request->input('dir', 'asc') : ($storedFilters['dir'] ?? 'asc')); // asc|desc
+        $year   = (int) ($hasFilterInput ? $request->input('vacation_year', date('Y')) : ($storedFilters['vacation_year'] ?? date('Y')));
+        $grupo  = $hasFilterInput ? $request->input('grupo') : ($storedFilters['grupo'] ?? null);
+
+        $request->session()->put($filterSessionKey, [
+            'search' => $search,
+            'activo' => $activo,
+            'sort' => $sort,
+            'dir' => $dir,
+            'vacation_year' => $year,
+            'grupo' => $grupo,
+        ]);
 
         // ⚡ Se pasan $search y $activo a buildCollection para empujar filtros a SQL
         $todos = $this->buildCollection($search, $activo);

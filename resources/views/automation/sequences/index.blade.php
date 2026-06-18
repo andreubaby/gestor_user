@@ -78,6 +78,12 @@
             animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
 
+        .sticky-quick-actions {
+            position: sticky;
+            bottom: 1rem;
+            z-index: 40;
+        }
+
         /* Hover effects */
         .card-hover {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -158,19 +164,51 @@
             </x-slot:actions>
         </x-ui.section-heading>
 
-        <!-- Mensaje de éxito/error -->
-        @if (session('success'))
-            <div class="mb-6 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-sm font-medium animate-slide-in flex items-center gap-2">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                {{ session('success') }}
-            </div>
-        @endif
+        @if (session('bulk_result'))
+            @php($bulk = session('bulk_result'))
+            <section class="mb-6 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-sm font-semibold text-slate-900">Detalle de acción masiva</h3>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <p class="text-xs text-slate-500">
+                            Total: {{ (int) ($bulk['total'] ?? 0) }} · OK: {{ count($bulk['ok'] ?? []) }} · Omitidas: {{ count($bulk['skipped'] ?? []) }} · Fallidas: {{ count($bulk['failed'] ?? []) }}
+                        </p>
+                        <a href="{{ route('automation.sequences.bulkActions.exportCsv') }}"
+                           class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                            Descargar CSV
+                        </a>
+                    </div>
+                </div>
 
-        @if (session('error'))
-            <div class="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 text-sm font-medium animate-slide-in flex items-center gap-2">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                {{ session('error') }}
-            </div>
+                <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
+                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <p class="mb-1 font-semibold text-emerald-700">OK</p>
+                        @forelse(($bulk['ok'] ?? []) as $row)
+                            <p class="text-emerald-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                        @empty
+                            <p class="text-emerald-700/80">Sin registros.</p>
+                        @endforelse
+                    </div>
+
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p class="mb-1 font-semibold text-amber-700">Omitidas</p>
+                        @forelse(($bulk['skipped'] ?? []) as $row)
+                            <p class="text-amber-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                        @empty
+                            <p class="text-amber-700/80">Sin registros.</p>
+                        @endforelse
+                    </div>
+
+                    <div class="rounded-lg border border-red-200 bg-red-50 p-3">
+                        <p class="mb-1 font-semibold text-red-700">Fallidas</p>
+                        @forelse(($bulk['failed'] ?? []) as $row)
+                            <p class="text-red-800">#{{ $row['id'] }} · {{ $row['name'] }} · {{ $row['reason'] }}</p>
+                        @empty
+                            <p class="text-red-700/80">Sin registros.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
         @endif
 
         <section class="mb-4 gradient-card rounded-2xl p-4 card-hover animate-slide-in">
@@ -200,7 +238,7 @@
                 </div>
                 <div class="md:col-span-4 flex gap-2">
                     <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">Aplicar filtros</button>
-                    <a href="{{ route('automation.sequences.index') }}" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition">Limpiar</a>
+                    <a href="{{ route('automation.sequences.index', ['reset_filters' => 1]) }}" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200 transition">Limpiar</a>
                 </div>
             </form>
 
@@ -296,6 +334,8 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" @click="collapseAll()" class="px-3 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-700 text-xs font-semibold border border-slate-300 transition">Replegar todas</button>
                     <button type="button" @click="expandAll()" class="px-3 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 text-xs font-semibold border border-blue-300 transition">Desplegar todas</button>
+                    <button type="button" @click="selectAllVisible()" class="px-3 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 text-xs font-semibold border border-indigo-300 transition">Seleccionar visibles</button>
+                    <button type="button" x-show="selectedIds.length > 0" x-cloak @click="clearSelection()" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300 transition">Limpiar seleccion</button>
                     <label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-300 bg-violet-50 text-violet-800 text-xs font-semibold cursor-pointer select-none">
                         <input type="checkbox" id="default-compact-mode" class="rounded border-violet-300 text-violet-600 focus:ring-violet-500" x-model="compactDefault" @change="persistCompactDefault()">
                         Compacto por defecto
@@ -303,6 +343,45 @@
                 </div>
             </div>
         </section>
+
+        <section class="sticky-quick-actions mb-4" x-show="selectedIds.length > 0" x-cloak>
+            <div class="rounded-2xl border border-blue-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm font-semibold text-slate-800">
+                        Seleccionadas: <span class="text-blue-700" x-text="selectedIds.length"></span>
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" @click="applyCollapseToSelected(true)" class="px-3 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-700 text-xs font-semibold border border-slate-300 transition">Replegar seleccionadas</button>
+                        <button type="button" @click="applyCollapseToSelected(false)" class="px-3 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 text-xs font-semibold border border-blue-300 transition">Desplegar seleccionadas</button>
+                        <button
+                            type="button"
+                            @click="openFirstSelected('show')"
+                            :disabled="selectedIds.length !== 1"
+                            :class="selectedIds.length === 1 ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-700' : 'bg-slate-100 text-slate-400 border-slate-300 cursor-not-allowed'"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold border transition"
+                        >Ver seleccionada</button>
+                        <button
+                            type="button"
+                            @click="openFirstSelected('edit')"
+                            :disabled="selectedIds.length !== 1"
+                            :class="selectedIds.length === 1 ? 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-700' : 'bg-slate-100 text-slate-400 border-slate-300 cursor-not-allowed'"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold border transition"
+                        >Editar seleccionada</button>
+                        <button type="button" @click="submitBulkAction('pause')" class="px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 text-xs font-semibold border border-amber-300 transition">Pausar seleccionadas</button>
+                        <button type="button" @click="submitBulkAction('activate')" class="px-3 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 text-xs font-semibold border border-emerald-300 transition">Reactivar seleccionadas</button>
+                        <button type="button" @click="submitBulkAction('execute')" class="px-3 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 text-xs font-semibold border border-indigo-300 transition">Ejecutar seleccionadas</button>
+                        <button type="button" @click="submitBulkAction('duplicate')" class="px-3 py-2 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 text-xs font-semibold border border-violet-300 transition">Duplicar seleccionadas</button>
+                        <button type="button" @click="submitBulkAction('save_template')" class="px-3 py-2 rounded-lg bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-700 text-xs font-semibold border border-fuchsia-300 transition">Guardar como plantilla</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <form id="bulk-actions-form" method="POST" action="{{ route('automation.sequences.bulkActions') }}" class="hidden">
+            @csrf
+            <input type="hidden" id="bulk-action-input" name="action" value="">
+            <div id="bulk-ids-container"></div>
+        </form>
 
         <!-- Grid de Secuencias -->
         @forelse($sequences as $sequence)

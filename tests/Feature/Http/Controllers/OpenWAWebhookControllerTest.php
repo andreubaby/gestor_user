@@ -3,22 +3,37 @@
 namespace Tests\Feature\Http\Controllers;
 
 use App\Models\WhatsappMessage;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class OpenWAWebhookControllerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Evita contaminación entre tests al usar idempotencia en cache.
+        Cache::flush();
+
+        Log::shouldReceive('channel')->andReturnSelf()->zeroOrMoreTimes();
+        Log::shouldReceive('info')->zeroOrMoreTimes();
+        Log::shouldReceive('warning')->zeroOrMoreTimes();
+        Log::shouldReceive('debug')->zeroOrMoreTimes();
+        Log::shouldReceive('error')->zeroOrMoreTimes();
+    }
+
     /** @test */
     public function it_receives_message_webhook_and_saves_message()
     {
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info')->times(2);
+        $messageId = 'msg-' . Str::uuid();
 
         $payload = [
             'event' => 'message.received',
             'session' => 'default',
             'message' => [
-                'id' => '123456789',
+                'id' => $messageId,
                 'from' => '34612345678@c.us',
                 'body' => 'Hello from WhatsApp',
                 'timestamp' => time(),
@@ -31,6 +46,7 @@ class OpenWAWebhookControllerTest extends TestCase
 
         $this->assertDatabaseHas('whatsapp_messages', [
             'chat_id' => '34612345678@c.us',
+            'message_id' => $messageId,
             'text' => 'Hello from WhatsApp',
             'direction' => 'inbound',
             'status' => 'received',
@@ -40,14 +56,13 @@ class OpenWAWebhookControllerTest extends TestCase
     /** @test */
     public function it_ignores_messages_sent_by_self()
     {
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info');
+        $messageId = 'msg-self-' . Str::uuid();
 
         $payload = [
             'event' => 'message.received',
             'session' => 'default',
             'message' => [
-                'id' => '123456789',
+                'id' => $messageId,
                 'from' => '34612345678@c.us',
                 'body' => 'Message from self',
                 'isGroupMsg' => false,
@@ -67,9 +82,6 @@ class OpenWAWebhookControllerTest extends TestCase
     /** @test */
     public function it_handles_session_status_webhook()
     {
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info');
-
         $payload = [
             'event' => 'session.status',
             'session' => 'default',
@@ -85,9 +97,6 @@ class OpenWAWebhookControllerTest extends TestCase
     public function it_validates_hmac_signature()
     {
         config(['openwa.webhook_secret' => 'test-secret']);
-
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('warning');
 
         $payload = ['event' => 'message.received'];
 
@@ -106,9 +115,6 @@ class OpenWAWebhookControllerTest extends TestCase
     {
         config(['openwa.webhook_secret' => null]);
 
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info');
-
         $payload = [
             'event' => 'session.status',
             'session' => 'default',
@@ -123,14 +129,13 @@ class OpenWAWebhookControllerTest extends TestCase
     /** @test */
     public function it_handles_message_status_webhook()
     {
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info')->times(2);
+        $messageId = 'status-' . Str::uuid();
 
         // Primero crear el mensaje
         $message = WhatsappMessage::create([
             'session_id' => 'default',
             'chat_id' => '34612345678@c.us',
-            'message_id' => '123456789',
+            'message_id' => $messageId,
             'text' => 'Test',
             'direction' => 'outbound',
             'status' => 'sent',
@@ -139,7 +144,7 @@ class OpenWAWebhookControllerTest extends TestCase
         // Simular webhook de entrega
         $payload = [
             'event' => 'message.status',
-            'messageId' => '123456789',
+            'messageId' => $messageId,
             'status' => 'delivered',
         ];
 
@@ -155,16 +160,15 @@ class OpenWAWebhookControllerTest extends TestCase
     /** @test */
     public function it_prevents_duplicate_webhook_processing()
     {
-        Log::shouldReceive('channel')->andReturnSelf();
-        Log::shouldReceive('info');
-        Log::shouldReceive('debug');
+        $messageId = 'dup-' . Str::uuid();
+        $idempotencyKey = 'unique-key-' . Str::uuid();
 
         $payload = [
             'event' => 'message.received',
-            'idempotencyKey' => 'unique-key-123',
+            'idempotencyKey' => $idempotencyKey,
             'session' => 'default',
             'message' => [
-                'id' => '123456789',
+                'id' => $messageId,
                 'from' => '34612345678@c.us',
                 'body' => 'Test',
             ],
@@ -181,7 +185,7 @@ class OpenWAWebhookControllerTest extends TestCase
         // Solo debería haber un mensaje en la BD
         $this->assertEquals(
             1,
-            WhatsappMessage::where('message_id', '123456789')->count()
+            WhatsappMessage::where('message_id', $messageId)->count()
         );
     }
 }
