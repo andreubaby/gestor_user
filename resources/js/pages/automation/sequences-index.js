@@ -2,8 +2,10 @@ export function registerSequenceDashboardComponent(Alpine) {
     Alpine.data('sequenceDashboard', () => ({
         storageKey: 'automation-sequence-collapsed-v1',
         compactDefaultKey: 'automation-sequence-compact-default-v1',
+        selectedKey: 'automation-sequence-selected-v1',
         compactDefault: false,
         collapsedMap: {},
+        selectedIds: [],
 
         init() {
             this.loadState();
@@ -21,6 +23,46 @@ export function registerSequenceDashboardComponent(Alpine) {
             } catch (_) {
                 this.compactDefault = false;
             }
+
+            try {
+                const saved = JSON.parse(localStorage.getItem(this.selectedKey) || '[]');
+                this.selectedIds = Array.isArray(saved) ? saved.map((id) => String(id)) : [];
+            } catch (_) {
+                this.selectedIds = [];
+            }
+        },
+
+        normalizeId(id) {
+            return String(id);
+        },
+
+        isSelected(id) {
+            return this.selectedIds.includes(this.normalizeId(id));
+        },
+
+        toggleSelected(id) {
+            const key = this.normalizeId(id);
+            if (this.isSelected(key)) {
+                this.selectedIds = this.selectedIds.filter((item) => item !== key);
+            } else {
+                this.selectedIds = [...this.selectedIds, key];
+            }
+            this.persistSelected();
+        },
+
+        clearSelection() {
+            this.selectedIds = [];
+            this.persistSelected();
+        },
+
+        selectAllVisible() {
+            const visibleIds = Array.from(document.querySelectorAll('.sequence-card[data-sequence-id]'))
+                .map((card) => card.dataset.sequenceId)
+                .filter(Boolean)
+                .map((id) => String(id));
+
+            this.selectedIds = Array.from(new Set(visibleIds));
+            this.persistSelected();
         },
 
         isCollapsed(id) {
@@ -53,6 +95,69 @@ export function registerSequenceDashboardComponent(Alpine) {
             this.persistCollapsed();
         },
 
+        applyCollapseToSelected(collapsed) {
+            if (this.selectedIds.length === 0) return;
+            this.selectedIds.forEach((id) => {
+                this.collapsedMap[String(id)] = collapsed;
+            });
+            this.persistCollapsed();
+        },
+
+        firstSelectedUrl(type) {
+            if (this.selectedIds.length !== 1) return '';
+
+            const first = this.selectedIds[0];
+            const card = document.querySelector(`.sequence-card[data-sequence-id="${first}"]`);
+            if (!card) return '';
+
+            if (type === 'edit') return card.dataset.sequenceEditUrl || '';
+            if (type === 'show') return card.dataset.sequenceShowUrl || '';
+            return '';
+        },
+
+        openFirstSelected(type) {
+            const target = this.firstSelectedUrl(type);
+            if (!target) return;
+            window.location.href = target;
+        },
+
+        submitBulkAction(action) {
+            if (this.selectedIds.length === 0) return;
+
+            const supportedActions = new Set(['pause', 'activate', 'execute', 'duplicate', 'save_template']);
+            if (!supportedActions.has(action)) return;
+
+            if (action === 'execute') {
+                if (!window.confirm(`¿Ejecutar ahora ${this.selectedIds.length} secuencia(s) seleccionada(s)?`)) {
+                    return;
+                }
+            }
+
+            if (action === 'save_template') {
+                if (!window.confirm(`¿Crear plantillas para ${this.selectedIds.length} secuencia(s) seleccionada(s)?`)) {
+                    return;
+                }
+            }
+
+            const form = document.getElementById('bulk-actions-form');
+            const actionInput = document.getElementById('bulk-action-input');
+            const idsContainer = document.getElementById('bulk-ids-container');
+            if (!form || !actionInput || !idsContainer) return;
+
+            actionInput.value = action;
+            idsContainer.innerHTML = '';
+
+            this.selectedIds.forEach((id) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'sequence_ids[]';
+                input.value = String(id);
+                idsContainer.appendChild(input);
+            });
+
+            form.submit();
+        },
+
         persistCollapsed() {
             try {
                 localStorage.setItem(this.storageKey, JSON.stringify(this.collapsedMap));
@@ -66,6 +171,14 @@ export function registerSequenceDashboardComponent(Alpine) {
                 localStorage.setItem(this.compactDefaultKey, this.compactDefault ? '1' : '0');
             } catch (_) {
                 // Preferencia global opcional.
+            }
+        },
+
+        persistSelected() {
+            try {
+                localStorage.setItem(this.selectedKey, JSON.stringify(this.selectedIds));
+            } catch (_) {
+                // Sin persistencia local, mantenemos seleccion en memoria.
             }
         },
     }));

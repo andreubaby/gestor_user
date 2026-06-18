@@ -52,6 +52,13 @@
         .panel.active {
             max-height: 500px;
         }
+
+        .sticky-cta {
+            position: sticky;
+            bottom: 0;
+            z-index: 30;
+            backdrop-filter: blur(8px);
+        }
     </style>
 @endpush
 
@@ -59,6 +66,11 @@
 <div class="min-h-screen text-slate-900">
     <main class="max-w-5xl mx-auto px-6 py-12">
         <x-ui.section-heading title="Nueva Secuencia" subtitle="Configura pasos, destino y adjuntos en un flujo limpio y consistente." />
+
+        <div class="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <a href="#section-basic" class="px-3 py-1 rounded-lg bg-white/80 text-slate-700 border border-slate-200 hover:bg-white transition">Informacion</a>
+            <a href="#section-steps" class="px-3 py-1 rounded-lg bg-white/80 text-slate-700 border border-slate-200 hover:bg-white transition">Pasos</a>
+        </div>
 
         @if ($errors->any())
             <div class="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-700 text-sm font-medium animate-slide-in">
@@ -75,7 +87,7 @@
             @csrf
 
             <!-- Sección 1: Información Básica -->
-            <section class="gradient-card rounded-2xl p-8 card-hover animate-slide-in">
+            <section id="section-basic" class="gradient-card rounded-2xl p-8 card-hover animate-slide-in">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center text-white">
                         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.3A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z"/></svg>
@@ -113,7 +125,7 @@
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">Estado *</label>
                             <select name="status" required class="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white input-focus outline-none">
-                                <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>🟢 Activo</option>
+                                <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}> Activo</option>
                                 <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>⭕ Inactivo</option>
                                 <option value="paused" {{ old('status') === 'paused' ? 'selected' : '' }}>⏸️ En pausa</option>
                             </select>
@@ -129,7 +141,7 @@
             </section>
 
             <!-- Sección 2: Constructor de Pasos -->
-            <section class="animate-slide-in" style="animation-delay: 0.1s">
+            <section id="section-steps" class="animate-slide-in" style="animation-delay: 0.1s">
                 <div class="gradient-card rounded-2xl p-8 card-hover">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center text-white">
@@ -150,7 +162,12 @@
             </section>
 
             <!-- Botones de Acción -->
-            <div class="flex gap-4 animate-slide-in" style="animation-delay: 0.2s">
+            <div class="sticky-cta mt-4 animate-slide-in rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-lg" style="animation-delay: 0.2s">
+                <div class="mb-2 flex items-center justify-between gap-2 text-xs text-slate-500">
+                    <span>Tip: usa Ctrl + Enter para guardar rapido</span>
+                    <a href="#section-steps" class="font-semibold text-blue-700 hover:text-blue-800">Ir a pasos</a>
+                </div>
+                <div class="flex gap-3">
                 <a href="{{ route('automation.sequences.index') }}" class="flex-1 px-6 py-3 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold text-center btn-hover hover:bg-slate-50">
                     Cancelar
                 </a>
@@ -158,6 +175,7 @@
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                     Crear Secuencia
                 </button>
+                </div>
             </div>
         </form>
     </main>
@@ -179,9 +197,9 @@
             <div>
                 <label class="text-xs font-semibold text-slate-600 uppercase block mb-2">Tipo de Destino</label>
                 <select name="steps[__INDEX__][type]" class="target-type w-full px-3 py-2 rounded-lg border border-slate-300 bg-white input-focus outline-none">
-                    <option value="person">👤 Persona</option>
-                    <option value="local_group">👥 Grupo Local</option>
-                    <option value="openwa_group">🌐 Grupo OpenWA</option>
+                    <option value="person"> Persona</option>
+                    <option value="local_group"> Grupo Local</option>
+                    <option value="openwa_group"> Grupo OpenWA</option>
                 </select>
             </div>
             <div>
@@ -197,7 +215,7 @@
                     <label class="text-xs font-semibold text-slate-600 uppercase block mb-2">Modo</label>
                     <select name="steps[__INDEX__][person_mode]" class="person-mode w-full px-3 py-2 rounded-lg border border-slate-300 bg-white input-focus outline-none">
                         <option value="phone">☎️ Teléfono directo</option>
-                        <option value="worker">🔍 Buscar trabajador</option>
+                        <option value="worker"> Buscar trabajador</option>
                     </select>
                 </div>
 
@@ -284,6 +302,7 @@
 @endphp
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
     const container = document.getElementById('steps-container');
     const template = document.getElementById('step-template');
     const addBtn = document.getElementById('add-step-btn');
@@ -296,6 +315,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const autosaveKey = 'automation-sequence-create-draft-v1';
 
     let stepIndex = 0;
+
+    function autoSelectSingleOption(selectElement) {
+        if (!selectElement || selectElement.value) return;
+        const validOptions = Array.from(selectElement.options).filter((option) => option.value && !option.disabled);
+        if (validOptions.length === 1) {
+            selectElement.value = validOptions[0].value;
+        }
+    }
 
     function createStep(data = {}) {
         const html = template.innerHTML.replaceAll('__INDEX__', stepIndex);
@@ -332,6 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const attachmentUrlInput = step.querySelector('.attachment-url');
         const attachmentNameInput = step.querySelector('.attachment-name');
         const attachmentList = step.querySelector('.attachment-list');
+
+        autoSelectSingleOption(step.querySelector('.local-group'));
+        autoSelectSingleOption(step.querySelector('.openwa-group'));
 
         function parseStepAttachments() {
             let attachmentUrls = [];
@@ -616,6 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addBtn.addEventListener('click', () => { createStep(); reindex(); });
 
+    autoSelectSingleOption(templateSelector);
+
     applyTemplateBtn?.addEventListener('click', () => {
         const templateId = templateSelector?.value;
         if (!templateId || !templates[templateId]) return;
@@ -688,8 +720,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.querySelector('form')?.addEventListener('submit', () => {
+    form?.addEventListener('submit', () => {
         localStorage.removeItem(autosaveKey);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.ctrlKey && event.key === 'Enter' && form) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
     });
 
     // Load old data

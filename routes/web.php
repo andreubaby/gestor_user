@@ -22,15 +22,15 @@ use App\Http\Controllers\UserFichajeController;
 use App\Http\Controllers\AutomationSequenceController;
 use App\Http\Controllers\MissingPunchReminderController;
 
-// 🔐 Redirige '/' directamente a /gestoria (modo admin)
+//  Redirige '/' directamente a /gestoria (modo admin)
 Route::redirect('/', '/gestoria');
 
-// 📎 Adjuntos de automatización (público para que OpenWA pueda descargar)
+//  Adjuntos de automatización (público para que OpenWA pueda descargar)
 Route::get('/automation/attachments/{filename}', [AutomationSequenceController::class, 'serveAttachment'])
     ->where('filename', '[A-Za-z0-9\-]+\.[A-Za-z0-9]+')
     ->name('automation.attachments.show');
 
-// 📱 Maria App (TimeGuard Pro) — React/Vite SPA
+//  Maria App (TimeGuard Pro) — React/Vite SPA
 Route::get('/maria-app/{any?}', function () {
     $indexPath = public_path('maria-app/index.html');
     if (!file_exists($indexPath)) {
@@ -39,61 +39,63 @@ Route::get('/maria-app/{any?}', function () {
     return response()->file($indexPath);
 })->where('any', '.*')->name('maria-app');
 
-// 🔐 Rutas para login (solo para invitados)
+//  Rutas para login (solo para invitados)
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
     Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')
-        ->name('register.store'); // 👈 AÑADE ESTO
+        ->name('register.store'); //  AÑADE ESTO
 });
 
-// 🔒 Rutas privadas (solo para administradores logueados)
+//  Rutas privadas (solo para administradores logueados)
 Route::middleware('auth')->group(function () {
 
-    // 📌 Página principal
+    //  Página principal
     Route::get('/gestoria', function () { return view('gestor.gestoria'); })->name('gestor.gestoria');
 
-    // 🧑‍🔧 TRABAJADORES (Polifonía)
+    // ‍ TRABAJADORES (Polifonía)
     Route::get('/trabajadores/{id}/edit', [TrabajadorController::class, 'edit'])->name('trabajadores.edit');
     Route::put('/trabajadores/{id}', [TrabajadorController::class, 'update'])->name('trabajadores.update');
 
-    // 👤 USUARIOS (base principal)
+    //  USUARIOS (base principal)
     Route::resource('usuarios', UsuarioController::class)->only(['index', 'edit', 'update']);
     Route::get('/usuarios/unificado/{email}', [UsuarioController::class, 'editUnificado'])->name('usuarios.edit.unificado');
     Route::get('/usuarios/unificado/uuid/{uuid}', [UsuarioController::class, 'editByUuid'])->name('usuarios.edit.uuid');
     Route::get('/usuarios/vincular', [UsuarioController::class, 'vincular'])->name('usuarios.vincular');
     Route::post('/usuarios/vincular', [UsuarioController::class, 'vincularStore'])->name('usuarios.vincular.store');
+    Route::get('/usuarios/vincular/sugerencias', [UsuarioController::class, 'vincularSuggestions'])->name('usuarios.vincular.suggestions');
 
     Route::get('/usuarios/vincular/{vinculo}/edit', [UsuarioController::class, 'vincularEdit'])->name('usuarios.vincular.edit');
     Route::put('/usuarios/vincular/{vinculo}', [UsuarioController::class, 'vincularUpdate'])->name('usuarios.vincular.update');
+    Route::post('/usuarios/bulk-actions', [UsuarioController::class, 'bulkActions'])->name('usuarios.bulk.actions');
 
 
-    // 👤 USUARIOS Buscador
+    //  USUARIOS Buscador
     Route::get('/buscador/user/{id}/edit', [UserBuscadorController::class, 'edit'])->name('buscador.user.edit');
     Route::put('/buscador/user/{id}', [UserBuscadorController::class, 'update'])->name('buscador.user.update');
 
     Route::get('/buscador/worker/{id}/edit', [WorkerBuscadorController::class, 'edit'])->name('buscador.worker.edit');
     Route::put('/buscador/worker/{id}', [WorkerBuscadorController::class, 'update'])->name('buscador.worker.update');
 
-    // 👤 USUARIOS Cronos
+    //  USUARIOS Cronos
     Route::get('/cronos/user/{id}/edit', [UserCronosController::class, 'edit'])->name('cronos.user.edit');
     Route::put('/cronos/user/{id}', [UserCronosController::class, 'update'])->name('cronos.user.update');
 
-    // 👤 USUARIOS Semillas
+    //  USUARIOS Semillas
     Route::get('/semillas/user/{id}/edit', [UserSemillasController::class, 'edit'])->name('semillas.user.edit');
     Route::put('/semillas/user/{id}', [UserSemillasController::class, 'update'])->name('semillas.user.update');
 
-    // 👤 USUARIOS Store
+    //  USUARIOS Store
     Route::get('/store/user/{id}/edit', [UserStoreController::class, 'edit'])->name('store.user.edit');
     Route::put('/store/user/{id}', [UserStoreController::class, 'update'])->name('store.user.update');
 
-    // 👤 USUARIOS Zeus
+    //  USUARIOS Zeus
     Route::get('/zeus/user/{id}/edit', [UserZeusController::class, 'edit'])->name('zeus.user.edit');
     Route::put('/zeus/user/{id}', [UserZeusController::class, 'update'])->name('zeus.user.update');
 
-    // 🛰️ USUARIOS PLUTÓN
+    // ️ USUARIOS PLUTÓN
     Route::put('/pluton/{pluton}', [UserPlutonController::class, 'update'])->name('pluton.update');
     Route::get('/pluton/{pluton}/edit', [UserPlutonController::class, 'edit'])->name('pluton.edit');
 
@@ -106,6 +108,24 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/usuarios/onboarding/send', [OnboardingController::class, 'onboardingSend'])
         ->name('usuarios.onboarding.send');
+
+    // Documentacion API (Swagger UI + spec YAML)
+    Route::get('/api/docs', function () {
+        return view('docs.swagger');
+    })->name('api.docs');
+
+    Route::get('/api/docs/openapi.yaml', function () {
+        $specPath = base_path('docs/openapi.yaml');
+
+        if (!file_exists($specPath)) {
+            abort(404, 'No se encontro docs/openapi.yaml');
+        }
+
+        return response()->file($specPath, [
+            'Content-Type' => 'application/yaml; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        ]);
+    })->name('api.docs.spec');
 
     // OpenWA - vista de colaboraciones
     Route::get('/openwa/colaboraciones', [OpenWACollaborationController::class, 'index'])
@@ -180,7 +200,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
         ->name('rrhh.documentos.zip');
 
-    // 👤 CREAR / EDITAR usuario en BD de fichajes
+    //  CREAR / EDITAR usuario en BD de fichajes
     Route::get('/fichajes/users/create', [UserFichajeController::class, 'create'])->name('fichajes.users.create');
     Route::post('/fichajes/users', [UserFichajeController::class, 'store'])->name('fichajes.users.store');
     Route::get('/fichajes/users/{id}/edit', [UserFichajeController::class, 'edit'])->name('fichajes.users.edit');
@@ -195,7 +215,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/tacografo/create', [TacografoController::class, 'create'])->name('tacografo.create');
     Route::post('/tacografo', [TacografoController::class, 'store'])->name('tacografo.store');
 
-    // 🤖 AUTOMATIZACIONES
+    //  AUTOMATIZACIONES
     Route::prefix('automation')->name('automation.')->group(function () {
         Route::get('/missing-punch/preview', [MissingPunchReminderController::class, 'index'])->name('missing-punch.preview');
         Route::resource('sequences', AutomationSequenceController::class)->names([
@@ -212,6 +232,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/search-trabajadores', [AutomationSequenceController::class, 'searchTrabajadores'])->name('api.search-trabajadores');
         Route::get('/api/sequences-live-status', [AutomationSequenceController::class, 'liveStatus'])->name('api.sequences-live-status');
         Route::post('/sequences/{sequence}/execute', [AutomationSequenceController::class, 'execute'])->name('sequences.execute');
+        Route::post('/sequences/bulk-actions', [AutomationSequenceController::class, 'bulkActions'])->name('sequences.bulkActions');
+        Route::get('/sequences/bulk-actions/export-csv', [AutomationSequenceController::class, 'exportBulkActionsCsv'])->name('sequences.bulkActions.exportCsv');
         Route::post('/sequences/{sequence}/toggle-status', [AutomationSequenceController::class, 'toggleStatus'])->name('sequences.toggleStatus');
         Route::post('/sequences/{sequence}/duplicate', [AutomationSequenceController::class, 'duplicate'])->name('sequences.duplicate');
         Route::post('/sequences/{sequence}/save-template', [AutomationSequenceController::class, 'saveAsTemplate'])->name('sequences.saveTemplate');
@@ -225,6 +247,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/audit/export-csv', [AutomationSequenceController::class, 'exportAuditCsv'])->name('audit.exportCsv');
     });
 
-    // 🚪 Cerrar sesión
+    //  Cerrar sesión
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
