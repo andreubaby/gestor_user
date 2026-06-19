@@ -265,6 +265,94 @@ class RrhhDocumentosController extends Controller
         return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
     }
 
+    public function zipFormacionTodos(Request $request)
+    {
+        $data = $request->validate([
+            'fecha' => ['nullable', 'date'],
+        ]);
+
+        $fecha = $data['fecha'] ?? date('Y-m-d');
+
+        $workers = TrabajadorPolifonia::query()
+            ->select(['id', 'nombre', 'nif', 'empresa'])
+            ->where('activo', 1)
+            ->orderBy('nombre')
+            ->get();
+
+        if ($workers->isEmpty()) {
+            abort(404, 'No hay trabajadores activos');
+        }
+
+        $docs = config('rrhh_docs.docs', []);
+        $tiposFormacion = ['cursos_formacion', 'plan_estres_termico'];
+
+        foreach ($tiposFormacion as $tipo) {
+            if (!isset($docs[$tipo])) {
+                abort(500, "Tipo de documento no configurado: {$tipo}");
+            }
+        }
+
+        $zipName = 'RRHH_Formacion_Todos_' . date('Y-m-d', strtotime($fecha)) . '.zip';
+        $zipPath = storage_path('app/tmp/' . $zipName);
+
+        $dir = dirname($zipPath);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            abort(500, 'No se pudo crear el directorio temporal para el ZIP');
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'No se pudo crear el ZIP');
+        }
+
+        $added = 0;
+
+        foreach ($workers as $t) {
+            $safeNombre = preg_replace('/[^A-Za-z0-9 _\-]/', '', (string) ($t->nombre ?? 'trabajador'));
+            $safeNombre = trim(preg_replace('/\s+/', ' ', $safeNombre));
+            $carpeta = $safeNombre;
+
+            foreach ($tiposFormacion as $tipo) {
+                $doc = $docs[$tipo];
+                [$templateRel, $templateAbs] = $this->resolveTemplatePath($doc['template'] ?? null);
+
+                if (!$templateAbs || !file_exists($templateAbs)) {
+                    Log::warning('[RRHH DOCS ZIP FORMACION] plantilla no encontrada', [
+                        'tipo' => $tipo, 'template_abs' => $templateAbs,
+                    ]);
+                    continue;
+                }
+
+                $filename = $this->buildFilename($doc, $t, $tipo, $fecha);
+
+                try {
+                    $builtAbs = $this->buildPdfForTipo($tipo, $t, '', $fecha, $templateAbs);
+                    if ($builtAbs && file_exists($builtAbs)) {
+                        $zip->addFile($builtAbs, $carpeta . '/' . $filename);
+                        $added++;
+                        continue;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[RRHH DOCS ZIP FORMACION] fallo generando PDF, se mete plantilla', [
+                        'trabajador' => $t->nombre, 'tipo' => $tipo, 'error' => $e->getMessage(),
+                    ]);
+                }
+
+                $zip->addFile($templateAbs, $carpeta . '/' . $filename);
+                $added++;
+            }
+        }
+
+        $zip->close();
+
+        if ($added === 0) {
+            @unlink($zipPath);
+            abort(404, 'No se pudo añadir ningún documento al ZIP');
+        }
+
+        return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
+    }
+
     // ------------------------------------------------------------
     // PDFTK helpers (AcroForm) with safe fallback
     // ------------------------------------------------------------
