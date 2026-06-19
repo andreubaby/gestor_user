@@ -200,6 +200,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/rrhh/documentos/zip', [RrhhDocumentosController::class, 'zip'])
         ->name('rrhh.documentos.zip');
 
+    Route::post('/rrhh/documentos/zip-formacion-todos', [RrhhDocumentosController::class, 'zipFormacionTodos'])
+        ->name('rrhh.documentos.zip-formacion-todos');
+
     //  CREAR / EDITAR usuario en BD de fichajes
     Route::get('/fichajes/users/create', [UserFichajeController::class, 'create'])->name('fichajes.users.create');
     Route::post('/fichajes/users', [UserFichajeController::class, 'store'])->name('fichajes.users.store');
