@@ -141,6 +141,21 @@ return [
             'filename' => 'Entrega_Videos_{nombre}_{dni}_{fecha}.pdf',
             'category' => 'Firmas',
         ],
+
+        // ========== FORMACIÓN / PRL ==========
+        'cursos_formacion' => [
+            'label'    => 'Plantilla Cursos de Formación',
+            'template' => 'rrhh_templates/Plantilla Cursos de Formacion.pdf',
+            'filename' => 'Cursos_Formacion_{nombre}_{dni}_{fecha}.pdf',
+            'category' => 'Formación',
+        ],
+
+        'plan_estres_termico' => [
+            'label'    => 'Plan Estrés Térmico',
+            'template' => 'rrhh_templates/Plan_Estres_Termico_original_una_hoja.pdf',
+            'filename' => 'Plan_Estres_Termico_{nombre}_{dni}_{fecha}.pdf',
+            'category' => 'Formación',
+        ],
     ],
 
     /*
@@ -155,6 +170,7 @@ return [
         'Vehículo'   => 'Vehículo',
         'Firmas'     => 'Firmas',
         'IT'         => 'IT / Formación',
+        'Formación'  => 'Formación / PRL',
         'Plantillas' => 'Plantillas base',
     ],
 
