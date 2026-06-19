@@ -451,6 +451,36 @@
         </form>
     </section>
 
+    {{-- ===== ZIP FORMACIÓN · TODOS LOS TRABAJADORES ACTIVOS ===== --}}
+    <section class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-sm font-bold text-amber-800 uppercase tracking-wide">ZIP Formación · Todos los trabajadores activos</h2>
+                    <p class="mt-1 text-sm text-amber-700">
+                        Genera un ZIP con <strong>Plantilla Cursos de Formación</strong> y <strong>Plan Estrés Térmico</strong>
+                        para cada trabajador activo, organizados en carpetas por nombre.
+                    </p>
+                </div>
+                <form method="POST" action="{{ route('rrhh.documentos.zip-formacion-todos') }}"
+                      class="flex flex-wrap items-end gap-3" id="formZipTodos">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-amber-700 mb-1">Fecha del documento</label>
+                        <input type="date" name="fecha" id="fechaTodos"
+                               value="{{ date('Y-m-d') }}"
+                               class="rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    </div>
+                    <button type="submit"
+                            class="px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600
+                                   transition focus:outline-none focus:ring-4 focus:ring-amber-300 shadow whitespace-nowrap">
+                        📦 Descargar ZIP todos
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
 </main>
 
 <script>
