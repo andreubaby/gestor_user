@@ -185,7 +185,7 @@ php artisan tinker
 
 Consulta también:
 
-* `QUEUE_MONITOR.md`
+* `RUNBOOK.md` (sección de colas y workers)
 * `config/queue.php`
 * `docker-compose.yml`
 
