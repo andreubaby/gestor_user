@@ -186,12 +186,60 @@
             if (icon) icon.textContent = isPwd ? '🙈' : '👁️';
         });
 
-        // 2) Evita doble submit accidental
+        // 2) Refresca el CSRF para evitar 419 tras inactividad
         const form = document.getElementById('loginForm');
         const submitBtn = document.getElementById('submitBtn');
-        form?.addEventListener('submit', () => {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-60','cursor-not-allowed');
+        const csrfInput = form?.querySelector('input[name="_token"]');
+        const csrfRefreshUrl = @json(route('csrf.refresh'));
+
+        const refreshCsrfToken = async () => {
+            const response = await fetch(csrfRefreshUrl, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+
+            if (!response.ok) {
+                throw new Error('No se pudo refrescar el token CSRF.');
+            }
+
+            const payload = await response.json();
+
+            if (csrfInput && payload?.token) {
+                csrfInput.value = payload.token;
+            }
+        };
+
+        if (form && submitBtn) {
+            form.addEventListener('submit', async (event) => {
+                if (form.dataset.submitting === '1') {
+                    return;
+                }
+
+                event.preventDefault();
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-60', 'cursor-not-allowed');
+
+                try {
+                    await refreshCsrfToken();
+                } catch (error) {
+                    console.warn(error);
+                }
+
+                form.dataset.submitting = '1';
+                form.submit();
+            });
+
+            // Mantiene vivo el token mientras el usuario permanece en login.
+            setInterval(() => {
+                refreshCsrfToken().catch(() => {
+                    // Silencioso: en submit ya se vuelve a intentar.
+                });
+            }, 10 * 60 * 1000);
+        }
+
+        refreshCsrfToken().catch(() => {
+            // Best-effort: se reintenta en submit y en el intervalo.
         });
 
         // 3) Persistencia del checkbox "remember" (localStorage)
