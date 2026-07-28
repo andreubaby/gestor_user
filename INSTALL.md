@@ -285,19 +285,17 @@ Cuando levantes el stack con `docker compose up -d`, se crearán estos servicios
 ---
 
 
-## 🔌 OpenWA: Instalación y configuración detallada
+## 🔌 OpenWA: Instalación y configuración
 
-OpenWA es el gateway de WhatsApp que permite enviar y recibir mensajes. Hay tres formas de instalarlo.
+OpenWA es el gateway de WhatsApp integrado opcionalmente en el proyecto. Está comentado por defecto en `docker-compose.yml`.
 
-### Paso previo: Configurar variables de entorno
+### Requisito previo: Configurar variables de entorno
 
-Antes de instalar OpenWA, asegúrate de tener estas variables en tu `.env`:
+Asegúrate de tener estas variables en tu `.env`:
 
 ```env
 # URL del servidor OpenWA
-OPENWA_BASE_URL=http://openwa:3000  # Si usas Docker
-# OPENWA_BASE_URL=http://host.docker.internal:3000  # Si OpenWA corre en Windows/macOS
-# OPENWA_BASE_URL=http://localhost:3000  # Si todo corre en local
+OPENWA_BASE_URL=http://openwa_gestor:3000
 
 # Credenciales
 OPENWA_API_KEY=your-api-key-here
@@ -307,6 +305,7 @@ OPENWA_WEBHOOK_SECRET=your-webhook-secret-here
 # Configuración adicional
 OPENWA_REQUEST_TIMEOUT=30000
 OPENWA_DEFAULT_COUNTRY_CODE=34
+OPENWA_PORT=3000
 
 # Rate limiting y deduplicación
 OPENWA_WEBHOOK_IDEMPOTENCY_TTL_SECONDS=86400
@@ -315,55 +314,33 @@ OPENWA_WEBHOOK_THROTTLE_PER_MINUTE=120
 
 ---
 
-### Opción A: OpenWA con Docker Compose (Recomendado para producción)
+### Instalación (3 pasos)
 
-El proyecto incluye `docker-compose.openwa.yml` que levanta OpenWA como contenedor.
-
-**1. Verificar que Laravel está corriendo:**
+**1. Clonar el repositorio OpenWA:**
 
 ```bash
-make ps
-# Debe mostrar los servicios activos (nginx, php, queue, etc.)
+make openwa-clone
 ```
 
-**2. Configurar variables en `.env`:**
+Este comando clona https://github.com/rmyndharis/OpenWA.git en el directorio del proyecto.
 
-```env
-OPENWA_BASE_URL=http://openwa:3000
-OPENWA_API_KEY=tu-api-key-segura
-OPENWA_SESSION_ID=default
-OPENWA_WEBHOOK_SECRET=tu-webhook-secret-seguro
-```
-
-**3. Levantar el stack OpenWA:**
+**2. Habilitar el servicio en docker-compose.yml:**
 
 ```bash
-make up-openwa
+make openwa-enable
 ```
 
-Esto iniciará:
-- Contenedor `openwa-gateway` en el puerto 3000
-- Volúmenes persistentes para sesiones
-- Conexión a la red de Laravel
+Esto descomenta el servicio `openwa` en `docker-compose.yml` para que se inicie junto con los demás servicios.
 
-**4. Verificar que OpenWA está activo:**
+**3. Levantar los servicios:**
 
 ```bash
-docker ps | grep openwa
-# Debe mostrar: openwa-gateway ... Up
-
-docker logs openwa-gateway
-# Debe mostrar los logs de inicio
+make up
+# o si ya están corriendo:
+make restart
 ```
 
-**5. Comprobar conectividad desde Laravel:**
-
-```bash
-docker exec php_gestor curl -H "X-API-Key: tu-api-key-segura" http://openwa:3000/api/health
-# Debe devolver: {"status":"ok",...}
-```
-
-**6. Escanear QR para conectar WhatsApp:**
+**4. Escanear QR para conectar WhatsApp:**
 
 Accede a la interfaz web de OpenWA:
 
@@ -379,15 +356,7 @@ Escanea el código QR con tu WhatsApp:
 
 Espera a que el estado cambie a **CONNECTED**.
 
-**7. Registrar el webhook en Laravel:**
-
-```bash
-docker exec php_gestor php artisan openwa:register-webhook
-```
-
-Esto configura OpenWA para que envíe eventos (mensajes entrantes, estados de entrega) a Laravel.
-
-**8. Validar configuración completa:**
+**5. Validar configuración:**
 
 ```bash
 make openwa-validate
@@ -399,331 +368,41 @@ Debe mostrar:
 ✓ OPENWA_API_KEY configurado
 ✓ Conexión a OpenWA exitosa
 ✓ Sesión CONNECTED
-✓ Webhook registrado
 ```
 
 ---
 
-### Opción B: OpenWA en host Windows (Desarrollo local)
-
-Si prefieres ejecutar OpenWA directamente en tu máquina Windows fuera de Docker.
-
-**1. Instalar OpenWA globalmente:**
-
-```powershell
-npm install -g @open-wa/wa-automate
-```
-
-**2. Crear archivo de configuración:**
-
-Crea un archivo `openwa-config.js`:
-
-```javascript
-module.exports = {
-  sessionId: 'default',
-  headless: true,
-  qrTimeout: 0,
-  authTimeout: 0,
-  restartOnCrash: true,
-  cacheEnabled: false,
-  useChrome: true,
-  killProcessOnBrowserClose: true,
-  throwErrorOnTosBlock: false,
-  chromiumArgs: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu'
-  ],
-  logConsole: true,
-  logConsoleErrors: true,
-  popup: true,
-  apiHost: 'localhost',
-  apiPort: 3000,
-  apiKey: 'your-api-key-here',
-  webhook: {
-    url: 'http://host.docker.internal:8077/api/webhooks/openwa',
-    events: ['message.received', 'message.status', 'session.status']
-  }
-};
-```
-
-**3. Arrancar OpenWA:**
-
-Usa el script PowerShell incluido:
-
-```powershell
-.\openwa-quickstart.ps1
-```
-
-O manualmente:
-
-```powershell
-wa-automate --config openwa-config.js
-```
-
-**4. Configurar Laravel para conectar al host:**
-
-En `.env`, usa `host.docker.internal`:
-
-```env
-OPENWA_BASE_URL=http://host.docker.internal:3000
-OPENWA_API_KEY=your-api-key-here
-```
-
-**5. Reiniciar contenedor PHP:**
+### Comandos útiles
 
 ```bash
-docker restart php_gestor
-```
+# Gestión
+make openwa-status         # Ver estado de OpenWA
+make openwa-logs           # Ver logs en tiempo real
+make openwa-validate       # Validar configuración
+make openwa-disable        # Deshabilitar servicio (comentar en docker-compose)
 
-**6. Escanear QR:**
+# Debugging
+make openwa-debug-phone USER_ID=123  # Depurar teléfono de usuario
 
-OpenWA abrirá una ventana emergente con el QR, o accede a:
-
-```
-http://localhost:3000
-```
-
-Escanea con WhatsApp (mismo proceso que Opción A).
-
-**7. Validar conexión:**
-
-```bash
-make openwa-validate
+# Desarrollo avanzado
+make openwa-clone          # Clonar/actualizar repositorio del gateway
 ```
 
 ---
 
-### Opción C: OpenWA en Linux/macOS (Desarrollo local)
+### Deshabilitar OpenWA
 
-Si tu entorno de desarrollo es Linux o macOS.
-
-**1. Instalar OpenWA:**
+Si no necesitas WhatsApp:
 
 ```bash
-npm install -g @open-wa/wa-automate
+make openwa-disable
+make restart
 ```
 
-**2. Usar el script incluido:**
-
-```bash
-chmod +x openwa-quickstart.sh
-./openwa-quickstart.sh
-```
-
-Este script:
-- Verifica Node.js
-- Instala dependencias
-- Inicia OpenWA en puerto 3000
-- Configura webhook automáticamente
-
-**3. Configurar Laravel:**
-
-```env
-OPENWA_BASE_URL=http://localhost:3000  # Si no usas Docker
-# o http://host.docker.internal:3000 si Laravel está en Docker
-```
-
-**4. Escanear QR y validar:**
-
-Mismo proceso que opciones anteriores.
+Esto comenta el servicio en `docker-compose.yml` y lo detiene.
 
 ---
-
-### Post-instalación: Verificación completa
-
-Una vez que OpenWA esté instalado y conectado:
-
-**1. Comprobar estado de sesión:**
-
-```bash
-docker exec php_gestor php artisan tinker
-```
-
-```php
-$client = new \App\Services\OpenWA\OpenWAClient();
-$session = $client->getSession();
-dd($session);
-// Debe mostrar: ["status" => "CONNECTED", "isConnected" => true, ...]
-```
-
-**2. Enviar mensaje de prueba:**
-
-```bash
-docker exec php_gestor php artisan tinker
-```
-
-```php
-$notifier = app(\App\Services\WhatsApp\WhatsappNotificationService::class);
-$notifier->sendToPhone('612345678', 'Mensaje de prueba desde Laravel');
-// Cambia '612345678' por tu número de prueba
-```
-
-**3. Verificar que el mensaje se guardó en BD:**
-
-```bash
-docker exec php_gestor php artisan tinker
-```
-
-```php
-\App\Models\WhatsappMessage::latest()->first();
-// Debe mostrar el mensaje recién enviado con status 'pending' o 'sent'
-```
-
-**4. Comprobar que el worker de colas procesa mensajes:**
-
-```bash
-make queue-heartbeat
-# Debe mostrar: ✔ Worker activo
-
-make logs-queue
-# Ver logs del worker procesando SendWhatsappMessageJob
-```
-
-**5. Verificar webhook (envía un mensaje desde WhatsApp):**
-
-Envía un mensaje desde tu móvil al número conectado a OpenWA.
-
-```bash
-make logs-app
-# Debe mostrar: "OpenWA webhook received: message.received"
-```
-
-Comprueba que se guardó en BD:
-
-```bash
-docker exec php_gestor php artisan tinker
-```
-
-```php
-\App\Models\WhatsappMessage::inbound()->latest()->first();
-// Debe mostrar el mensaje entrante
-```
-
 ---
-
-### Troubleshooting OpenWA
-
-#### OpenWA no conecta
-
-**Síntoma:** El QR no aparece o OpenWA se queda en "Connecting..."
-
-**Solución:**
-```bash
-# Ver logs de OpenWA
-docker logs -f openwa-gateway  # Si usas Docker
-# o revisar la terminal donde corre OpenWA en local
-
-# Reiniciar OpenWA
-make down-openwa && make up-openwa  # Docker
-# o Ctrl+C y relanzar en local
-```
-
-#### Laravel no puede conectar a OpenWA
-
-**Síntoma:** Error "Connection refused" o "Could not resolve host"
-
-**Solución:**
-```bash
-# Desde dentro del contenedor PHP, hacer ping
-docker exec php_gestor ping openwa  # Si OpenWA está en Docker
-docker exec php_gestor ping host.docker.internal  # Si OpenWA está en host
-
-# Verificar que OPENWA_BASE_URL es correcto en .env
-docker exec php_gestor php artisan config:clear
-docker exec php_gestor php artisan config:cache
-```
-
-#### Webhook no recibe eventos
-
-**Síntoma:** OpenWA conecta, mensajes se envían, pero no llegan webhooks
-
-**Solución:**
-```bash
-# 1. Verificar que la URL del webhook es accesible desde OpenWA
-curl http://localhost:8077/api/webhooks/openwa
-# Debe devolver 405 Method Not Allowed (es correcto, solo acepta POST)
-
-# 2. Re-registrar webhook
-docker exec php_gestor php artisan openwa:register-webhook
-
-# 3. Ver logs de Laravel
-make logs-app | grep -i webhook
-```
-
-#### Error "Invalid HMAC signature"
-
-**Síntoma:** Webhooks son rechazados con 403
-
-**Solución:**
-```env
-# Asegúrate de que OPENWA_WEBHOOK_SECRET coincide en .env y en la config de OpenWA
-OPENWA_WEBHOOK_SECRET=mismo-secreto-en-ambos-lados
-```
-
-```bash
-docker exec php_gestor php artisan config:clear
-docker restart php_gestor
-```
-
-#### Mensajes se quedan en "pending"
-
-**Síntoma:** Mensajes se crean en BD pero no se envían
-
-**Solución:**
-```bash
-# 1. Verificar que el worker de colas está activo
-make queue-heartbeat
-
-# 2. Ver jobs fallidos
-make queue-failed
-
-# 3. Ver logs del worker
-make logs-queue
-
-# 4. Reintentar jobs fallidos
-make queue-retry
-```
-
-#### Sesión se desconecta frecuentemente
-
-**Síntoma:** Cada pocas horas OpenWA pide escanear QR de nuevo
-
-**Solución:**
-- Asegúrate de que el volumen de sesiones está persistiendo:
-  ```bash
-  docker volume ls | grep openwa
-  ```
-- No uses el mismo número en múltiples instancias de OpenWA simultáneamente
-- Verifica que tu número de WhatsApp no está siendo bloqueado por WhatsApp
-
----
-
-### Comandos útiles OpenWA
-
-```bash
-# Validar configuración completa
-make openwa-validate
-
-# Depurar resolución de teléfono para un usuario
-make openwa-debug-phone USER_ID=123
-
-# Ver logs específicos de OpenWA
-make logs-openwa
-
-# Reiniciar solo OpenWA (Docker)
-docker restart openwa-gateway
-
-# Limpiar sesión y reconectar (requiere escanear QR de nuevo)
-docker volume rm gestor-de-usuarios_openwa-sessions
-make up-openwa
-```
-
-------
 
 ## ✅ Verificación post-instalación
 
@@ -957,4 +636,5 @@ Si encuentras problemas no cubiertos en esta guía:
 **¡Instalación completada!** 🎉
 
 Ahora puedes empezar a desarrollar o desplegar en producción.
+
 
