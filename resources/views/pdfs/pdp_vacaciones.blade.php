@@ -89,6 +89,7 @@
         $empresaNombre = 'BABYPLANT, S.L.';
         $empresaCIF = 'B30126650';
         $empresaDir = 'Ctra. Santomera - Alquerías, Km. 1';
+        $firmante = 'Carmen Antón Cayuelas';
         break;
 
       case 'Babyplant Spain S.L.':
@@ -96,6 +97,7 @@
         $empresaNombre = 'BABYPLANT SPAIN, S.L.';
         $empresaCIF = 'B13715131';
         $empresaDir = 'Ctra. Santomera - Alquerías, Km. 1';
+        $firmante = 'Carmen Antón Cayuelas';
         break;
 
       case 'Perijena':
@@ -103,6 +105,7 @@
         $empresaNombre = 'PERIJENA, S.L.U.';
         $empresaCIF = 'B44875920';
         $empresaDir = 'Acequia de Zaraiche, 21 - Santomera';
+        $firmante = 'Pedro Campillo Herrero';
         break;
 
       default:
@@ -110,6 +113,7 @@
         $empresaNombre = $empresa;
         $empresaCIF = '';
         $empresaDir = '';
+        $firmante = '';
         break;
     }
 @endphp
@@ -143,7 +147,7 @@
 
 <div class="firmas">
     <div class="firma">
-        <div class="linea-firma">{{ $trabajador }}</div>
+        <div class="linea-firma2">{{ $firmante }}</div>
     </div>
 
     <div class="firma">
