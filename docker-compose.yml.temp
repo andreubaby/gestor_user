@@ -148,36 +148,45 @@
             - laravel
         restart: always
 
-    openwa:
-        build:
-            context: ./OpenWA
-            dockerfile: Dockerfile
-        container_name: openwa_gestor
-        restart: always
-        working_dir: /app
-        environment:
-            API_KEY: ${OPENWA_API_KEY}
-            WEBHOOK_URL: http://nginx_gestor:${APP_PORT:-8077}/api/webhooks/openwa
-            WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
-            PORT: 3000
-            SESSIONS_DIR: /root/.openwa/sessions
-            LOG_LEVEL: info
-        ports:
-            - "${OPENWA_PORT:-3000}:3000"
-        volumes:
-            - openwa_sessions:/root/.openwa/sessions
-            - openwa_logs:/root/.openwa/logs
-        networks:
-            - laravel
-        depends_on:
-            - nginx
-            - php
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:3000/"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-            start_period: 60s
+
+    # ═════════════════════════════════════════════════════════════════════════════
+    # OPENWA - WhatsApp Gateway (Opcional)
+    # ═════════════════════════════════════════════════════════════════════════════
+    # Descomentar este servicio si quieres usar mensajería de WhatsApp
+    # Requiere: make openwa-clone
+    # Luego: make openwa-enable && make restart
+    # ═════════════════════════════════════════════════════════════════════════════
+
+    # openwa:
+    #     build:
+    #         context: ./OpenWA
+    #         dockerfile: Dockerfile
+    #     container_name: openwa_gestor
+    #     restart: always
+    #     working_dir: /app
+    #     environment:
+    #         API_KEY: ${OPENWA_API_KEY}
+    #         WEBHOOK_URL: http://nginx_gestor:${APP_PORT:-8077}/api/webhooks/openwa
+    #         WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
+    #         PORT: 3000
+    #         SESSIONS_DIR: /root/.openwa/sessions
+    #         LOG_LEVEL: info
+    #     ports:
+    #         - "${OPENWA_PORT:-3000}:3000"
+    #     volumes:
+    #         - openwa_sessions:/root/.openwa/sessions
+    #         - openwa_logs:/root/.openwa/logs
+    #     networks:
+    #         - laravel
+    #     depends_on:
+    #         - nginx
+    #         - php
+    #     healthcheck:
+    #         test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+    #         interval: 30s
+    #         timeout: 10s
+    #         retries: 3
+    #         start_period: 60s
 
 networks:
     laravel:
@@ -193,7 +202,9 @@ volumes:
         driver: local
     bootstrap_cache_data:
         driver: local
-    openwa_sessions:
-        driver: local
-    openwa_logs:
-        driver: local
+    # openwa_sessions:
+    #     driver: local
+    # openwa_logs:
+    #     driver: local
+
+
