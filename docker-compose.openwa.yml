@@ -1,7 +1,7 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-# DOCKER-COMPOSE PARA INTEGRACIÓN OPENWA
+﻿# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# DOCKER-COMPOSE PARA INTEGRACIÃ“N OPENWA
 #
-# Este archivo de ejemplo muestra cómo ejecutar tanto Laravel como OpenWA
+# Este archivo de ejemplo muestra cÃ³mo ejecutar tanto Laravel como OpenWA
 # en contenedores Docker interconectados.
 #
 # OPCIONES:
@@ -13,14 +13,14 @@
 #   docker-compose up -d
 #   docker-compose down
 #   docker-compose logs -f openwa
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 version: '3.8'
 
 services:
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # LARAVEL APP
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   laravel:
     build:
       context: .
@@ -30,14 +30,14 @@ services:
     working_dir: /app
 
     environment:
-      # ─── Base del App ────────────────────────────────────────────────────
+      # â”€â”€â”€ Base del App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       APP_NAME: "Gestor Usuarios"
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}
       APP_URL: http://localhost:8000
 
-      # ─── Base de Datos ───────────────────────────────────────────────────
+      # â”€â”€â”€ Base de Datos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       DB_CONNECTION: mysql
       DB_HOST: mysql
       DB_PORT: 3306
@@ -45,22 +45,22 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
 
-      # ─── Redis (opcional para caché/sessions) ────────────────────────────
+      # â”€â”€â”€ Redis (opcional para cachÃ©/sessions) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
-      # ─── Queue (procesamiento de jobs) ───────────────────────────────────
+      # â”€â”€â”€ Queue (procesamiento de jobs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       QUEUE_CONNECTION: redis  # O 'database'
 
-      # ─── Logs ────────────────────────────────────────────────────────────
+      # â”€â”€â”€ Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       LOG_CHANNEL: stack
       LOG_LEVEL: debug
 
-      # ────────────────────────────────────────────────────────────────────────
-      # ✨ OPENWA CONFIGURATION ✨
-      # ────────────────────────────────────────────────────────────────────────
+      # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      # âœ¨ OPENWA CONFIGURATION âœ¨
+      # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       #
-      # OPCIÓN 1: OpenWA en otro contenedor (recomendado)
+      # OPCIÃ“N 1: OpenWA en otro contenedor (recomendado)
       # -> El servicio "openwa" debe estar en este mismo compose
       # -> Laravel accede como: http://openwa:3000
       #
@@ -72,9 +72,9 @@ services:
       OPENWA_DEFAULT_COUNTRY_CODE: 34
 
       #
-      # OPCIÓN 2: OpenWA en host Windows/Linux (desarrollo)
-      # -> Descomentar siguiente línea
-      # -> Comentar línea anterior de OPENWA_BASE_URL
+      # OPCIÃ“N 2: OpenWA en host Windows/Linux (desarrollo)
+      # -> Descomentar siguiente lÃ­nea
+      # -> Comentar lÃ­nea anterior de OPENWA_BASE_URL
       # -> OpenWA debe estar escuchando en localhost:3000
       #
       # OPENWA_BASE_URL: http://host.docker.internal:3000
@@ -101,13 +101,16 @@ services:
              php artisan queue:work redis --memory=512 &
              php artisan serve --host=0.0.0.0"
 
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # OPENWA - WhatsApp Gateway
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   openwa:
-    image: open-wa/wa-automate:latest
-    # O si prefieres una versión específica:
-    # image: open-wa/wa-automate:3.0.4
+    # OPCIÓN 1: Construir desde repositorio clonado (requiere: make openwa-clone)
+    build:
+      context: ./OpenWA
+      dockerfile: Dockerfile
+    # OPCIÓN 2: Si tienes una imagen precompilada (descomentar y comentar build)
+    # image: tu-registry/openwa:latest
 
     container_name: openwa-gateway
     restart: unless-stopped
@@ -116,15 +119,15 @@ services:
       # API Key para autenticar requests
       API_KEY: ${OPENWA_API_KEY}
 
-      # Webhook URL que OpenWA usará para enviar eventos
+      # Webhook URL que OpenWA usarÃ¡ para enviar eventos
       # IMPORTANTE: debe ser accesible desde OpenWA
       # En Docker: http://laravel:8000/api/webhooks/openwa
       # En prod: https://tuapp.com/api/webhooks/openwa
       WEBHOOK_URL: http://laravel:8000/api/webhooks/openwa
       WEBHOOK_SECRET: ${OPENWA_WEBHOOK_SECRET}
 
-      # Más variables según tu setup de OpenWA
-      # Ver documentación: https://github.com/open-wa/wa-automate-nodejs
+      # MÃ¡s variables segÃºn tu setup de OpenWA
+      # Ver documentaciÃ³n: https://github.com/open-wa/wa-automate-nodejs
 
       # Puerto donde escucha
       PORT: 3000
@@ -155,9 +158,9 @@ services:
       retries: 3
       start_period: 60s
 
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # MySQL Database
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   mysql:
     image: mysql:8.0
     container_name: gestor-usuarios-mysql
@@ -183,9 +186,9 @@ services:
       timeout: 20s
       retries: 10
 
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # Redis - Cache & Queue
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   redis:
     image: redis:7-alpine
     container_name: gestor-usuarios-redis
@@ -208,9 +211,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # Nginx - Web Server (Opcional, si quieres reverse proxy)
-  # ───────────────────────────────────────────────────────────────────────────
+  # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   # nginx:
   #   image: nginx:alpine
   #   container_name: gestor-usuarios-nginx
@@ -245,9 +248,9 @@ volumes:
   openwa-logs:
     driver: local
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # INSTRUCCIONES DE USO
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 #
 # 1. PREPARAR VARIABLES DE ENTORNO:
 #    cp .env.example .env
@@ -273,7 +276,7 @@ volumes:
 # 7. API DE OPENWA:
 #    http://localhost:3000
 #
-# 8. VERIFICAR QUE OPENWA ESTÁ LISTO:
+# 8. VERIFICAR QUE OPENWA ESTÃ LISTO:
 #    docker-compose exec openwa curl -H "X-API-Key: {OPENWA_API_KEY}" \
 #      http://localhost:3000/api/sessions/default
 #
@@ -283,5 +286,28 @@ volumes:
 # 10. REGISTRAR WEBHOOK EN OPENWA:
 #     docker-compose exec laravel php artisan openwa:register-webhook
 #
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# IMPORTANTE: DOCKERFILE PARA OPENWA
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# El repositorio OpenWA debe incluir su propio Dockerfile.
+# Si no lo tiene, ejecuta: make openwa-clone
+# Y crea OpenWA/Dockerfile con este contenido:
+#
+# FROM node:18-alpine
+# WORKDIR /app
+# RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont curl
+# ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# COPY package*.json ./
+# RUN npm install --production
+# COPY . .
+# EXPOSE 3000
+# CMD ["npm", "start"]
+#
+# ═════════════════════════════════════════════════════════════════════════════

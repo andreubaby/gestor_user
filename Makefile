@@ -99,14 +99,6 @@ restart: ## Reinicia todos los contenedores
 ps: ## Estado de los contenedores
 	$(DC) ps
 
-.PHONY: up-openwa
-up-openwa: ## Levanta el stack con OpenWA integrado (docker-compose.openwa.yml)
-	docker compose -f docker-compose.openwa.yml up -d
-
-.PHONY: down-openwa
-down-openwa: ## Para el stack OpenWA
-	docker compose -f docker-compose.openwa.yml down
-
 # =============================================================================
 # DESARROLLO LOCAL (sin Docker)
 # =============================================================================
@@ -196,13 +188,67 @@ queue-work: ## Arranca un worker de colas manualmente (local)
 # OPENWA / WHATSAPP
 # =============================================================================
 
+.PHONY: openwa-clone
+openwa-clone: ## Clona el repositorio OpenWA (necesario para usar WhatsApp)
+	@if [ -d "OpenWA" ]; then \
+		printf "$(YELLOW)⚠ El directorio OpenWA ya existe$(RESET)\n"; \
+		printf "$(YELLOW)¿Quieres eliminarlo y clonar de nuevo? [s/N] $(RESET)"; \
+		read CONFIRM; \
+		if [ "$CONFIRM" = "s" ]; then \
+			rm -rf OpenWA; \
+			git clone https://github.com/rmyndharis/OpenWA.git && \
+			printf "$(GREEN)✔ Repositorio OpenWA clonado$(RESET)\n" || \
+			printf "$(RED)✗ Error al clonar OpenWA$(RESET)\n"; \
+		fi \
+	else \
+		git clone https://github.com/rmyndharis/OpenWA.git && \
+		printf "$(GREEN)✔ Repositorio OpenWA clonado$(RESET)\n" || \
+		printf "$(RED)✗ Error al clonar OpenWA. Verifica tu conexión a internet.$(RESET)\n"; \
+	fi
+
+.PHONY: openwa-enable
+openwa-enable: ## Habilita el servicio OpenWA en docker-compose.yml
+	@printf "\n$(BOLD)$(GREEN)▶ Habilitando servicio OpenWA$(RESET)\n\n"
+	@if [ ! -d "OpenWA" ]; then \
+		printf "$(YELLOW)→ Repositorio OpenWA no encontrado, clonando...$(RESET)\n"; \
+		$(MAKE) openwa-clone; \
+	fi
+	@printf "$(CYAN)Descomentando servicio openwa en docker-compose.yml...$(RESET)\n"
+	@sed -i 's/^  # openwa:/  openwa:/g' docker-compose.yml
+	@sed -i 's/^  #   /    /g' docker-compose.yml
+	@sed -i 's/^  # openwa_/  openwa_/g' docker-compose.yml
+	@printf "$(GREEN)✔ Servicio OpenWA habilitado$(RESET)\n"
+	@printf "$(YELLOW)Ejecuta 'make up' o 'make restart' para aplicar cambios$(RESET)\n"
+
+.PHONY: openwa-disable
+openwa-disable: ## Deshabilita el servicio OpenWA en docker-compose.yml
+	@printf "$(CYAN)Comentando servicio openwa en docker-compose.yml...$(RESET)\n"
+	@sed -i 's/^  openwa:/  # openwa:/g' docker-compose.yml
+	@sed -i 's/^    /  #   /g' docker-compose.yml
+	@sed -i 's/^  openwa_/  # openwa_/g' docker-compose.yml
+	@printf "$(GREEN)✔ Servicio OpenWA deshabilitado$(RESET)\n"
+
 .PHONY: openwa-validate
 openwa-validate: ## Valida la configuración de OpenWA
 	docker exec $(PHP_CONTAINER) php artisan openwa:validate
 
 .PHONY: openwa-debug-phone
-openwa-debug-phone: ## Depura resolución de teléfono para un usuario. Uso: make openwa-debug-phone USER_ID=123
+openwa-debug-phone: ## Depura resolución de teléfono. Uso: make openwa-debug-phone USER_ID=123
 	docker exec $(PHP_CONTAINER) php artisan openwa:debug-phone $(USER_ID)
+
+.PHONY: openwa-logs
+openwa-logs: ## Ver logs del contenedor OpenWA
+	docker logs -f openwa_gestor
+
+.PHONY: openwa-status
+openwa-status: ## Muestra el estado de OpenWA
+	@printf "\n$(BOLD)$(CYAN)Estado de OpenWA$(RESET)\n\n"
+	@docker ps | grep openwa_gestor || printf "$(YELLOW)⚠ OpenWA no está corriendo$(RESET)\n"
+	@printf "\n$(CYAN)Para habilitar OpenWA:$(RESET)\n"
+	@printf "  1. make openwa-clone         # Clonar repositorio\n"
+	@printf "  2. make openwa-enable        # Habilitar en docker-compose.yml\n"
+	@printf "  3. make up                   # Levantar servicios\n"
+	@printf "  4. Abrir http://localhost:3000 y escanear QR\n\n"
 
 # =============================================================================
 # FICHAJES / SINCRONIZACIÓN
@@ -317,3 +363,8 @@ reset: ## Reseteo completo: down + clean + install (¡borra todo!)
 		&& read CONFIRM && [ "$$CONFIRM" = "s" ] || { printf "Cancelado\n"; exit 1; }
 	@$(MAKE) clean
 	@$(MAKE) install
+
+
+
+
+

@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# OpenWA - WhatsApp Gateway (repositorio externo clonado)
+# No trackear porque es un repo independiente
+OpenWA/
