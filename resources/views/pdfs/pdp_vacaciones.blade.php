@@ -149,10 +149,6 @@
     <div class="firma">
         <div class="linea-firma2">{{ $firmante }}</div>
     </div>
-
-    <div class="firma">
-        <div class="linea-firma2">Carmen Antón Cayuelas</div>
-    </div>
 </div>
 
 <div class="fecha">
